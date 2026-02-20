@@ -1,0 +1,12 @@
+# /etc/systemd/system/tao-scanner.timer
+[Unit]
+Description=Timer for TAO Bounce Scanner (9:00 and 9:30 AM Eastern)
+
+[Timer]
+# systemd uses 'Wall clock' time; you can specify the zone in the string
+OnCalendar=America/New_York *-*-* 09:00:00
+OnCalendar=America/New_York *-*-* 09:30:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,7 @@
+FROM localhost/tao-bounce-scanner
+USER root
+RUN pip install pytest
+USER appuser
+COPY storage.py .
+COPY debug_scanner.py .
+ENTRYPOINT ["python", "debug_scanner.py"]

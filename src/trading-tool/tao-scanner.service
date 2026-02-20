@@ -1,0 +1,20 @@
+# /etc/systemd/system/tao-scanner.service
+[Unit]
+Description=TAO Bounce Scanner Service
+Documentation=https://github.com/your-repo/tao-scanner
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=root
+WorkingDirectory=/usr/local/bin
+ExecStart=/usr/local/bin/run_tao_bounce_scanner.sh
+# Force the process to use Eastern Time regardless of host settings
+Environment="TZ=America/New_York"
+# Security hardening: Prevent the service from writing to sensitive areas
+ReadOnlyPaths=/etc /usr
+ReadWritePaths=/var/log
+
+[Install]
+WantedBy=multi-user.target

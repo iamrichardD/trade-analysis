@@ -1,0 +1,30 @@
+# --- Terraform State & Secrets ---
+*.tfstate
+*.tfstate.backup
+.terraform/
+*.tfvars
+*.tfvars.json
+
+# --- Sensitive Credentials ---
+.env
+auth.json
+secrets.txt
+
+# --- Python & System Garbage ---
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+.DS_Store
+
+# --- Trading Data & Reports ---
+# We keep the code, but we do not track the specific scan results
+/scans/*
+tao_scan_*.csv
+
+# --- Executables ---
+# Optional: if you want to keep the wrapper script local only
+# deploy_tao_scanner.sh
+
+.idea/

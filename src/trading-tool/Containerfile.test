@@ -1,0 +1,10 @@
+FROM localhost/tao-bounce-scanner
+USER root
+RUN pip install pytest
+USER appuser
+COPY storage.py .
+COPY tao_bounce_scanner.py .
+COPY test_storage.py .
+COPY test_scanner.py .
+COPY pytest.ini .
+ENTRYPOINT ["pytest", "-s", ".", "--ignore=libs"]

@@ -1,0 +1,5 @@
+# Tao of Trading - Core Dependencies
+tradingview-screener==2.5.0
+pandas==2.2.0
+pydantic==2.6.1
+pyarrow==23.0.0

@@ -34,9 +34,9 @@ class TaoBounceScanner:
     def _build_query(self) -> Query:
         """
         Defines the initial query for liquid US common stocks with strong bullish trends, 
-        perfect EMA stacking, and a price pullback.
+        perfect EMA stacking, price pullback, and a bullish RSI(2) state.
         Why: We only want to trade liquid stocks (high volume/cap) with orderly trends 
-        that are currently in a pullback state (Stoch.K <= 40).
+        that are in a pullback (Stoch.K <= 40) and starting to show momentum (RSI2 > 10).
         Moving these filters server-side ensures the results are high-quality candidates, 
         overcoming the default 50-row limit.
         """
@@ -56,6 +56,7 @@ class TaoBounceScanner:
                 .where(col(f'EMA{EMA_SLOW}') > col(f'EMA{EMA_EXTENDED_1}'))
                 .where(col(f'EMA{EMA_EXTENDED_1}') > col(f'EMA{EMA_EXTENDED_2}'))
                 .where(col('Stoch.K') <= STOCH_PULLBACK_THRESHOLD)
+                .where(col('RSI2') > RSI_BULLISH_CROSS_LEVEL)
                 .limit(150))
 
     def _fetch_data(self) -> pd.DataFrame:
@@ -104,7 +105,7 @@ class TaoBounceScanner:
         logging.info(f"Step 5 (Earnings Check): {len(df)} remaining")
         if df.empty: return df
 
-        # 6. RSI(2) Trigger
+        # 6. RSI(2) Trigger (Partially filtered in Query, cross validated locally)
         df = self._filter_rsi_trigger(df)
         logging.info(f"Step 6 (RSI Trigger): {len(df)} remaining")
 

@@ -33,10 +33,11 @@ class TaoBounceScanner:
 
     def _build_query(self) -> Query:
         """
-        Defines the initial query for liquid US common stocks with strong bullish trends.
-        Why: We only want to trade liquid stocks (high volume/cap) to ensure easy entry/exit.
-        Moving trend filters server-side ensures the results are already relevant candidates, 
-        overcoming the default 50-row limit.
+        Defines the initial query for liquid US common stocks with strong bullish trends 
+        and perfect EMA stacking.
+        Why: We only want to trade liquid stocks (high volume/cap) with orderly trends.
+        Moving trend and stacking filters server-side ensures the results are high-quality 
+        candidates, overcoming the default 50-row limit.
         """
         return (Query().set_markets('america')
                 .select('name', 'close', 'EMA8', 'EMA21', 'EMA34', 'EMA55', 'EMA89', 'SMA200', 
@@ -49,6 +50,10 @@ class TaoBounceScanner:
                 .where(col('exchange').isin(['NYSE', 'NASDAQ']))
                 .where(col('ADX') >= MIN_ADX)
                 .where(col('close') > col(f'SMA{SMA_TREND}'))
+                .where(col(f'EMA{EMA_FAST}') > col(f'EMA{EMA_MEDIUM}'))
+                .where(col(f'EMA{EMA_MEDIUM}') > col(f'EMA{EMA_SLOW}'))
+                .where(col(f'EMA{EMA_SLOW}') > col(f'EMA{EMA_EXTENDED_1}'))
+                .where(col(f'EMA{EMA_EXTENDED_1}') > col(f'EMA{EMA_EXTENDED_2}'))
                 .limit(150))
 
     def _fetch_data(self) -> pd.DataFrame:
@@ -77,7 +82,7 @@ class TaoBounceScanner:
         logging.info(f"Step 1 (Trend & Strength): {len(df)} remaining")
         if df.empty: return df
 
-        # 2. EMA Stacking Logic
+        # 2. EMA Stacking Logic (Already filtered in Query, validated locally)
         df = self._filter_ema_stacking(df)
         logging.info(f"Step 2 (EMA Stacking): {len(df)} remaining")
         if df.empty: return df

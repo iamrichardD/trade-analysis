@@ -37,7 +37,7 @@
 - [ ] **Move Filters Server-side**: Progressively move local filters to the TradingView `Query().where(...)` to reduce data transfer and over-filtering risks:
     - [x] Move Trend & Strength (ADX >= 20, Close > SMA200).
     - [x] Move EMA Stacking (8 > 21 > 34 > 55 > 89).
-    - [ ] Move Pullback (Stochastic K <= 40).
+    - [x] Move Pullback (Stochastic K <= 40).
     - [ ] Move RSI(2) condition (RSI(2) > 10).
     - [ ] Move Earnings condition (if possible).
     - [ ] Move Action Zone (if possible).

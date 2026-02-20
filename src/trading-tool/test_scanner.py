@@ -1,8 +1,9 @@
 import pytest
+import pandas as pd
 from unittest.mock import patch, MagicMock
 from typing import Dict, Any, Generator, List, Optional
 from datetime import datetime, timedelta
-from tao_bounce_scanner import run_tao_of_trading_scan
+from tao_bounce_scanner import run_tao_of_trading_scan, TaoBounceScanner
 from storage import ScannerConfig
 
 @pytest.fixture
@@ -297,3 +298,97 @@ def Should_NotFilterStock_When_RSI2_triggers(mock_get_scanner_data: MagicMock) -
         mock_get_writer.return_value = mock_writer
         run_tao_of_trading_scan(ScannerConfig(output_type="log"))
         mock_writer.write.assert_called_once()
+
+# --- Tests for Individual Filter Methods (Diagnostic Support) ---
+
+def test_filter_trend_strength() -> None:
+    """
+    Tests _filter_trend_strength in isolation.
+    Why: Ensures the trend filter correctly identifies candidates above SMA200 with ADX >= 20.
+    """
+    scanner = TaoBounceScanner(ScannerConfig(output_type="log"))
+    df = pd.DataFrame([
+        {"name": "PASS", "close": 110, "SMA200": 100, "ADX": 25},
+        {"name": "FAIL_SMA", "close": 90, "SMA200": 100, "ADX": 25},
+        {"name": "FAIL_ADX", "close": 110, "SMA200": 100, "ADX": 15},
+    ])
+    result = scanner._filter_trend_strength(df)
+    assert len(result) == 1
+    assert result.iloc[0]["name"] == "PASS"
+
+def test_filter_ema_stacking() -> None:
+    """
+    Tests _filter_ema_stacking in isolation.
+    Why: Verifies that only 'perfectly' stacked EMAs pass the filter.
+    """
+    scanner = TaoBounceScanner(ScannerConfig(output_type="log"))
+    df = pd.DataFrame([
+        {"name": "PASS", "EMA8": 50, "EMA21": 40, "EMA34": 30, "EMA55": 20, "EMA89": 10},
+        {"name": "FAIL_ORDER", "EMA8": 50, "EMA21": 30, "EMA34": 40, "EMA55": 20, "EMA89": 10},
+    ])
+    result = scanner._filter_ema_stacking(df)
+    assert len(result) == 1
+    assert result.iloc[0]["name"] == "PASS"
+
+def test_filter_pullback() -> None:
+    """
+    Tests _filter_pullback in isolation.
+    Why: Ensures stocks with Stoch.K <= 40 are correctly identified as pullbacks.
+    """
+    scanner = TaoBounceScanner(ScannerConfig(output_type="log"))
+    df = pd.DataFrame([
+        {"name": "PASS", "Stoch.K": 35},
+        {"name": "FAIL", "Stoch.K": 45},
+    ])
+    result = scanner._filter_pullback(df)
+    assert len(result) == 1
+    assert result.iloc[0]["name"] == "PASS"
+
+def test_filter_action_zone() -> None:
+    """
+    Tests _filter_action_zone in isolation.
+    Why: Verifies that price must be within 1 ATR of the EMA21.
+    """
+    scanner = TaoBounceScanner(ScannerConfig(output_type="log"))
+    df = pd.DataFrame([
+        {"name": "PASS", "close": 105, "EMA21": 100, "ATR": 10}, # Dist 5 <= 10
+        {"name": "FAIL", "close": 115, "EMA21": 100, "ATR": 10}, # Dist 15 > 10
+    ])
+    result = scanner._filter_action_zone(df)
+    assert len(result) == 1
+    assert result.iloc[0]["name"] == "PASS"
+
+def test_filter_earnings() -> None:
+    """
+    Tests _filter_earnings in isolation.
+    Why: Confirms that stocks with imminent earnings are filtered out.
+    """
+    scanner = TaoBounceScanner(ScannerConfig(output_type="log"))
+    now = datetime.now()
+    safe_date = (now + timedelta(days=20)).timestamp()
+    risky_date = (now + timedelta(days=5)).timestamp()
+    
+    df = pd.DataFrame([
+        {"name": "PASS", "earnings_release_next_date": safe_date},
+        {"name": "FAIL", "earnings_release_next_date": risky_date},
+        {"name": "PASS_NONE", "earnings_release_next_date": None},
+    ])
+    result = scanner._filter_earnings(df)
+    assert len(result) == 2
+    assert "PASS" in result["name"].values
+    assert "PASS_NONE" in result["name"].values
+
+def test_filter_rsi_trigger() -> None:
+    """
+    Tests _filter_rsi_trigger in isolation.
+    Why: Validates the RSI(2) bullish cross signal.
+    """
+    scanner = TaoBounceScanner(ScannerConfig(output_type="log"))
+    df = pd.DataFrame([
+        {"name": "PASS", "RSI2[1]": 5, "RSI2": 15},   # Crossed up
+        {"name": "FAIL_LOW", "RSI2[1]": 5, "RSI2": 8}, # Still low
+        {"name": "FAIL_HIGH", "RSI2[1]": 15, "RSI2": 20}, # Already high
+    ])
+    result = scanner._filter_rsi_trigger(df)
+    assert len(result) == 1
+    assert result.iloc[0]["name"] == "PASS"

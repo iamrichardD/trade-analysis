@@ -14,3 +14,6 @@
 - [x] Validated changes with `pytest`.
 - [x] Refactored `test_scanner.py` and `test_storage.py` to include strict type hints and comprehensive "Why" docstrings.
 - [x] Improved docstrings in `tao_bounce_scanner.py` and `storage.py` to explain the reasoning behind logic.
+- [x] Implemented diagnostic logging in `_apply_filters` to track candidate counts at each step.
+- [x] Refactored filter logic into modular private methods to enable isolated testing.
+- [x] Added unit tests for each individual filter step in `test_scanner.py`.

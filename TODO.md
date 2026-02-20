@@ -27,3 +27,7 @@
 - [x] **Documentation**: Improve docstrings for all functions to follow a consistent standard and explain the "Why".
 - [x] **Test Refactoring**: Add type hints to tests and ensure all tests follow a consistent naming convention.
 - [x] **Constants Management**: Extract hardcoded thresholds (ADX=20, Stoch.K=40, etc.) into a configuration or constants module.
+- [x] **Diagnostic/Over-filtering Support**:
+    - [x] Refactor `_apply_filters` into modular private methods.
+    - [x] Add diagnostic logging to report candidate counts after each filter step.
+    - [x] Add unit tests for each individual filter method in `test_scanner.py`.

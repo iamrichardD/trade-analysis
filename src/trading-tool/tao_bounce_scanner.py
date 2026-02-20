@@ -58,64 +58,109 @@ class TaoBounceScanner:
 
     def _apply_filters(self, df: pd.DataFrame) -> pd.DataFrame:
         """
-        Applies the Bounce 2.0 technical filters to the DataFrame.
-        Why: This is the core strategy logic. It filters the universe of stocks down to 
-        only those exhibiting the specific setup we want to trade.
+        Applies the Bounce 2.0 technical filters to the DataFrame sequentially.
+        Why: This is the core strategy logic. We track the count at each step to help
+        diagnose over-filtering.
         """
         if df.empty:
             return df
 
+        initial_count = len(df)
+        logging.info(f"Starting filter pipeline with {initial_count} candidates.")
+
         # 1. Trend & Strength
-        # Why: We only trade strong trends (ADX>20) and only long above the 200 SMA.
-        df = df[df['ADX'] >= MIN_ADX]
-        df = df[df['close'] > df[f'SMA{SMA_TREND}']]
+        df = self._filter_trend_strength(df)
+        logging.info(f"Step 1 (Trend & Strength): {len(df)} remaining")
+        if df.empty: return df
 
-        # 2. EMA Stacking Logic (8 > 21 > 34 > 55 > 89)
-        # Why: "Perfect" stacking confirms a robust, orderly trend without chop.
-        df = df[df[f'EMA{EMA_FAST}'] > df[f'EMA{EMA_MEDIUM}']]
-        df = df[df[f'EMA{EMA_MEDIUM}'] > df[f'EMA{EMA_SLOW}']]
-        df = df[df[f'EMA{EMA_SLOW}'] > df[f'EMA{EMA_EXTENDED_1}']]
-        df = df[df[f'EMA{EMA_EXTENDED_1}'] > df[f'EMA{EMA_EXTENDED_2}']]
+        # 2. EMA Stacking Logic
+        df = self._filter_ema_stacking(df)
+        logging.info(f"Step 2 (EMA Stacking): {len(df)} remaining")
+        if df.empty: return df
 
-        # 3. Pullback Logic (Stochastics <= 40)
-        # Why: We buy dips. Low stochastics indicate the price has pulled back within the trend.
-        df = df[df['Stoch.K'] <= STOCH_PULLBACK_THRESHOLD]
+        # 3. Pullback Logic
+        df = self._filter_pullback(df)
+        logging.info(f"Step 3 (Pullback): {len(df)} remaining")
+        if df.empty: return df
 
-        # 4. Action Zone Filter: Price within 1 ATR of the EMA21
-        # Why: The "Action Zone" is the sweet spot for mean reversion entries.
+        # 4. Action Zone Filter
+        df = self._filter_action_zone(df)
+        logging.info(f"Step 4 (Action Zone): {len(df)} remaining")
+        if df.empty: return df
+
+        # 5. Earnings Check
+        df = self._filter_earnings(df)
+        logging.info(f"Step 5 (Earnings Check): {len(df)} remaining")
+        if df.empty: return df
+
+        # 6. RSI(2) Trigger
+        df = self._filter_rsi_trigger(df)
+        logging.info(f"Step 6 (RSI Trigger): {len(df)} remaining")
+
+        return df
+
+    def _filter_trend_strength(self, df: pd.DataFrame) -> pd.DataFrame:
+        """
+        Filters for stocks in a strong trend (ADX > 20) and above the 200 SMA.
+        """
+        return df[(df['ADX'] >= MIN_ADX) & (df['close'] > df[f'SMA{SMA_TREND}'])]
+
+    def _filter_ema_stacking(self, df: pd.DataFrame) -> pd.DataFrame:
+        """
+        Filters for 'Perfect' EMA stacking (8 > 21 > 34 > 55 > 89).
+        """
+        mask = (df[f'EMA{EMA_FAST}'] > df[f'EMA{EMA_MEDIUM}']) & \
+               (df[f'EMA{EMA_MEDIUM}'] > df[f'EMA{EMA_SLOW}']) & \
+               (df[f'EMA{EMA_SLOW}'] > df[f'EMA{EMA_EXTENDED_1}']) & \
+               (df[f'EMA{EMA_EXTENDED_1}'] > df[f'EMA{EMA_EXTENDED_2}'])
+        return df[mask]
+
+    def _filter_pullback(self, df: pd.DataFrame) -> pd.DataFrame:
+        """
+        Filters for stocks that have pulled back (Stochastics <= 40).
+        """
+        return df[df['Stoch.K'] <= STOCH_PULLBACK_THRESHOLD]
+
+    def _filter_action_zone(self, df: pd.DataFrame) -> pd.DataFrame:
+        """
+        Filters for stocks where price is within 1 ATR of the EMA21 'Action Zone'.
+        """
+        df = df.copy() # Avoid SettingWithCopyWarning
         df['dist_from_mean'] = abs(df['close'] - df[f'EMA{EMA_MEDIUM}'])
-        df = df[df['dist_from_mean'] <= df['ATR']]
+        return df[df['dist_from_mean'] <= df['ATR']].drop(columns=['dist_from_mean'])
 
-        # 5. Earnings Check: Exclude if earnings within next 14 days
-        # Why: Earnings are binary events with huge risk. We step aside.
+    def _filter_earnings(self, df: pd.DataFrame) -> pd.DataFrame:
+        """
+        Filters out stocks with earnings announcements within the next 14 days.
+        """
+        if 'earnings_release_next_date' not in df.columns:
+            return df
+
         now = datetime.now()
         buffer_date = now + timedelta(days=EARNINGS_BUFFER_DAYS)
         
-        # 'earnings_release_next_date' is a timestamp. 
-        # Note: TradingView API typically returns Unix timestamp (seconds).
-        if 'earnings_release_next_date' in df.columns:
-            # Ensure it's numeric
-            df['earnings_ts'] = pd.to_numeric(df['earnings_release_next_date'], errors='coerce')
-            
-            now_ts = now.timestamp()
-            buffer_ts = buffer_date.timestamp()
-            
-            # Filter: Keep if NaN (unknown date usually implies safe or far future in some data sets, 
-            # though here we assume safe if missing to avoid over-filtering) 
-            # OR date < now (past earnings) OR date > buffer_date (far future earnings).
-            mask_earnings_safe = (df['earnings_ts'].isna()) | \
-                                 (df['earnings_ts'] < now_ts) | \
-                                 (df['earnings_ts'] > buffer_ts)
-            
-            df = df[mask_earnings_safe].drop(columns=['earnings_ts'])
+        # Ensure it's numeric
+        df = df.copy()
+        df['earnings_ts'] = pd.to_numeric(df['earnings_release_next_date'], errors='coerce')
+        
+        now_ts = now.timestamp()
+        buffer_ts = buffer_date.timestamp()
+        
+        mask_earnings_safe = (df['earnings_ts'].isna()) | \
+                             (df['earnings_ts'] < now_ts) | \
+                             (df['earnings_ts'] > buffer_ts)
+        
+        return df[mask_earnings_safe].drop(columns=['earnings_ts'])
 
-        # 6. RSI(2) Trigger: Bullish entry when RSI(2) crosses back above 10
-        # Condition: Previous RSI2 <= 10 AND Current RSI2 > 10
-        # Why: This is the precise timing trigger. It shows momentum shifting back to the upside.
-        if 'RSI2' in df.columns and 'RSI2[1]' in df.columns:
-            df = df[(df['RSI2[1]'] <= RSI_BULLISH_CROSS_LEVEL) & (df['RSI2'] > RSI_BULLISH_CROSS_LEVEL)]
-
-        return df
+    def _filter_rsi_trigger(self, df: pd.DataFrame) -> pd.DataFrame:
+        """
+        Filters for the RSI(2) bullish trigger (crossed above 10).
+        """
+        if 'RSI2' not in df.columns or 'RSI2[1]' not in df.columns:
+            return df
+            
+        mask = (df['RSI2[1]'] <= RSI_BULLISH_CROSS_LEVEL) & (df['RSI2'] > RSI_BULLISH_CROSS_LEVEL)
+        return df[mask]
 
     def run_scan(self) -> None:
         """

@@ -2,7 +2,7 @@
 
 - [x] Study Python code and identify improvement opportunities.
 - [x] Document improvement opportunities in `TODO.md`.
-- [ ] Implement improvements identified.
+- [x] Implement improvements identified.
 
 ## Identified Improvement Opportunities
 
@@ -24,6 +24,6 @@
     - `test_scanner.py`
     - `test_storage.py`
 - [x] **Code Cleanup**: Remove duplicate `sys` import in `tao_bounce_scanner.py`.
-- [ ] **Documentation**: Improve docstrings for all functions to follow a consistent standard and explain the "Why".
-- [ ] **Test Refactoring**: Add type hints to tests and ensure all tests follow a consistent naming convention.
+- [x] **Documentation**: Improve docstrings for all functions to follow a consistent standard and explain the "Why".
+- [x] **Test Refactoring**: Add type hints to tests and ensure all tests follow a consistent naming convention.
 - [x] **Constants Management**: Extract hardcoded thresholds (ADX=20, Stoch.K=40, etc.) into a configuration or constants module.

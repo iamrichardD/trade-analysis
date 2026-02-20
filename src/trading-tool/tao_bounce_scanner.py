@@ -33,9 +33,10 @@ class TaoBounceScanner:
 
     def _build_query(self) -> Query:
         """
-        Defines the initial query for liquid US common stocks.
-        Why: We only want to trade liquid stocks (high volume/cap) to ensure easy entry/exit 
-        and avoid penny stock manipulation risks.
+        Defines the initial query for liquid US common stocks with strong bullish trends.
+        Why: We only want to trade liquid stocks (high volume/cap) to ensure easy entry/exit.
+        Moving trend filters server-side ensures the results are already relevant candidates, 
+        overcoming the default 50-row limit.
         """
         return (Query().set_markets('america')
                 .select('name', 'close', 'EMA8', 'EMA21', 'EMA34', 'EMA55', 'EMA89', 'SMA200', 
@@ -45,7 +46,10 @@ class TaoBounceScanner:
                 .where(col('subtype').isin(['common']))
                 .where(col('market_cap_basic') > MIN_MARKET_CAP)
                 .where(col('average_volume_30d_calc') > MIN_AVG_VOLUME)
-                .where(col('exchange').isin(['NYSE', 'NASDAQ'])))
+                .where(col('exchange').isin(['NYSE', 'NASDAQ']))
+                .where(col('ADX') >= MIN_ADX)
+                .where(col('close') > col(f'SMA{SMA_TREND}'))
+                .limit(150))
 
     def _fetch_data(self) -> pd.DataFrame:
         """
@@ -68,7 +72,7 @@ class TaoBounceScanner:
         initial_count = len(df)
         logging.info(f"Starting filter pipeline with {initial_count} candidates.")
 
-        # 1. Trend & Strength
+        # 1. Trend & Strength (Already filtered in Query, validated locally)
         df = self._filter_trend_strength(df)
         logging.info(f"Step 1 (Trend & Strength): {len(df)} remaining")
         if df.empty: return df

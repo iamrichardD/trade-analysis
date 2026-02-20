@@ -78,9 +78,9 @@ class TaoBounceScanner:
         logging.info(f"Step 2 (EMA Stacking): {len(df)} remaining")
         if df.empty: return df
 
-        # 3. Pullback Logic
-        df = self._filter_pullback(df)
-        logging.info(f"Step 3 (Pullback): {len(df)} remaining")
+        # 3. Pullback Logic (Disabled for testing)
+        # df = self._filter_pullback(df)
+        logging.info(f"Step 3 (Pullback): {len(df)} remaining (FILTER DISABLED)")
         if df.empty: return df
 
         # 4. Action Zone Filter

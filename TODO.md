@@ -89,3 +89,11 @@
     - [x] Document credentials and tokens (Proxmox, AWS) in the root README.md.
     - [x] Document optional `--security-opt seccomp=unconfined` flag for Podman troubleshooting in root README.md.
     - [x] Add a visual/textual representation of the data flow.
+
+## Bug Fixes
+
+### Command Line Interface (CLI)
+- [x] **Fix direction flag bug**: The scanner currently ignores the `--direction` command-line argument because the `if __name__ == "__main__":` block in `tao_bounce_scanner.py` hardcodes the `ScannerConfig`.
+    - [x] **Investigation:** Confirmed that `tao_bounce_scanner.py` does not use `argparse` or any other mechanism to parse `sys.argv`.
+    - [x] **Plan:** Implement `argparse` in `tao_bounce_scanner.py` to correctly populate `ScannerConfig` from CLI arguments (e.g., `--direction`, `--output_type`, `--path`, `--sns_topic_arn`).
+    - [x] **Verification:** Run `podman run ... --direction short` and verify that results show `SHORT` signals and bearish targets.

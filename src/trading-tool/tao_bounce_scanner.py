@@ -3,6 +3,7 @@ import pandas as pd
 from tradingview_screener import Query, Column as col
 from datetime import datetime, timedelta
 import logging
+import argparse
 from typing import List, Optional, Any, Dict, Union
 from storage import get_writer, ConfigurationError, ScannerConfig, DataWriter
 
@@ -313,7 +314,55 @@ def run_tao_of_trading_scan(config: Union[ScannerConfig, Dict[str, Any]]) -> Non
     scanner = TaoBounceScanner(config)
     scanner.run_scan()
 
+def parse_args() -> argparse.Namespace:
+    """
+    Parses command line arguments for the scanner.
+    Why: Enables CLI control over direction, output, and configuration without modifying code.
+    """
+    parser = argparse.ArgumentParser(description="Tao of Trading - Bounce 2.0 Scanner")
+    parser.add_argument(
+        "--direction", 
+        choices=["long", "short"], 
+        default="long",
+        help="Scanning direction (default: long)"
+    )
+    parser.add_argument(
+        "--output_type", 
+        choices=["file", "log", "email"], 
+        default="log",
+        help="Output destination (default: log)"
+    )
+    parser.add_argument(
+        "--path", 
+        help="Output file path (required if output is 'file')"
+    )
+    parser.add_argument(
+        "--sns_topic_arn", 
+        help="AWS SNS Topic ARN (required if output is 'email')"
+    )
+    parser.add_argument(
+        "--aws_region", 
+        default="us-east-1",
+        help="AWS Region for SNS (default: us-east-1)"
+    )
+    return parser.parse_args()
+
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO, stream=sys.stdout)
-    log_config = ScannerConfig(output_type="log")
-    run_tao_of_trading_scan(log_config)
+    args = parse_args()
+    
+    try:
+        config = ScannerConfig(
+            output_type=args.output_type,
+            direction=args.direction,
+            path=args.path,
+            sns_topic_arn=args.sns_topic_arn,
+            aws_region=args.aws_region
+        )
+        run_tao_of_trading_scan(config)
+    except ConfigurationError as ce:
+        logging.error(f"Configuration Error: {ce}")
+        sys.exit(1)
+    except Exception as e:
+        logging.error(f"Unexpected Error: {e}")
+        sys.exit(1)

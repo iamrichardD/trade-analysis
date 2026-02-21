@@ -557,3 +557,40 @@ def test_should_include_all_short_filters_in_query() -> None:
     ema8_filter = next(f for f in filters if f['left'] == 'EMA8')
     assert ema8_filter['operation'] == 'less'
     assert ema8_filter['right'] == 'EMA21'
+
+def test_should_parse_cli_arguments_correctly():
+    """
+    Verifies that the parser correctly handles CLI arguments.
+    Why: Ensures that users can control the scanner via command line as intended.
+    """
+    from tao_bounce_scanner import parse_args
+    import sys
+    
+    test_args = [
+        "tao_bounce_scanner.py", 
+        "--direction", "short", 
+        "--output_type", "file", 
+        "--path", "/tmp/scans"
+    ]
+    
+    with patch.object(sys, 'argv', test_args):
+        args = parse_args()
+        assert args.direction == "short"
+        assert args.output_type == "file"
+        assert args.path == "/tmp/scans"
+
+def test_should_use_default_cli_arguments():
+    """
+    Verifies the default values of CLI arguments.
+    Why: Confirms that the scanner behaves as expected when no flags are provided.
+    """
+    from tao_bounce_scanner import parse_args
+    import sys
+    
+    test_args = ["tao_bounce_scanner.py"]
+    
+    with patch.object(sys, 'argv', test_args):
+        args = parse_args()
+        assert args.direction == "long"
+        assert args.output_type == "log"
+        assert args.aws_region == "us-east-1"

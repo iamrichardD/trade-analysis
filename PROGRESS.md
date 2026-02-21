@@ -26,6 +26,11 @@
 - [x] Documented "Zero-Host Policy" and security architecture in root README.
 - [x] Added "Secrets & Configuration" section to root README.md to document Proxmox and AWS credential requirements.
 - [x] Documented optional `--security-opt seccomp=unconfined` flag for Podman troubleshooting in root README.md.
+- [x] **Investigated Bug: Direction flag ignored**: Confirmed that `tao_bounce_scanner.py` ignores CLI arguments in its `__main__` block, causing `--direction short` to be ignored in favor of the default `long` setting.
+    - [x] Documented investigation and fix plan in `TODO.md`.
+- [x] **Fixed Bug: Direction flag ignored**: Implemented `argparse` in `tao_bounce_scanner.py` to correctly handle CLI arguments and populate `ScannerConfig`.
+    - [x] Added unit tests for CLI argument parsing in `test_scanner.py`.
+    - [x] Verified fix with 40 passing tests in Podman environment.
 
 ## 2026-02-20
 - [x] Initialized `TODO.md` and `PROGRESS.md`.

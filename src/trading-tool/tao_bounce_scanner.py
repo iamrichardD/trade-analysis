@@ -46,28 +46,35 @@ class TaoBounceScanner:
         Moving these filters server-side ensures the results are high-quality candidates, 
         overcoming the default 50-row limit.
         """
+        now = datetime.now()
+        future_14 = now + timedelta(days=EARNINGS_BUFFER_DAYS)
+
         return (Query().set_markets('america')
                 .select('name', 'close', 'EMA8', 'EMA21', 'EMA34', 'EMA55', 'EMA89', 
                         'SMA50', 'SMA100', 'SMA200', 
                         'ATR', ADX_COL, STOCH_K_COL, 'relative_volume_10d_calc', 'change',
                         'RSI2', 'RSI2[1]', 'earnings_release_next_date')
-                .where(col('type').isin(['stock']))
-                .where(col('subtype').isin(['common']))
-                .where(col('market_cap_basic') > MIN_MARKET_CAP)
-                .where(col('average_volume_30d_calc') > MIN_AVG_VOLUME)
-                .where(col('exchange').isin(['NYSE', 'NASDAQ']))
-                .where(col('change') > 0)
-                .where(col('relative_volume_10d_calc') > 1.0)
-                .where(col(ADX_COL) >= MIN_ADX)
-                .where(col('close') > col(f'SMA{SMA_INSTITUTIONAL_50}'))
-                .where(col('close') > col(f'SMA{SMA_INSTITUTIONAL_100}'))
-                .where(col('close') > col(f'SMA{SMA_TREND}'))
-                .where(col(f'EMA{EMA_FAST}') > col(f'EMA{EMA_MEDIUM}'))
-                .where(col(f'EMA{EMA_MEDIUM}') > col(f'EMA{EMA_SLOW}'))
-                .where(col(f'EMA{EMA_SLOW}') > col(f'EMA{EMA_EXTENDED_1}'))
-                .where(col(f'EMA{EMA_EXTENDED_1}') > col(f'EMA{EMA_EXTENDED_2}'))
-                .where(col(STOCH_K_COL) <= STOCH_PULLBACK_THRESHOLD)
-                .where(col('RSI2') > RSI_BULLISH_CROSS_LEVEL)
+                .where(
+                    col('type').isin(['stock']),
+                    col('subtype').isin(['common']),
+                    col('market_cap_basic') > MIN_MARKET_CAP,
+                    col('average_volume_30d_calc') > MIN_AVG_VOLUME,
+                    col('exchange').isin(['NYSE', 'NASDAQ']),
+                    col('change') > 0,
+                    col('relative_volume_10d_calc') > 1.0,
+                    col(ADX_COL) >= MIN_ADX,
+                    col('close') > col(f'SMA{SMA_INSTITUTIONAL_50}'),
+                    col('close') > col(f'SMA{SMA_INSTITUTIONAL_100}'),
+                    col('close') > col(f'SMA{SMA_TREND}'),
+                    col(f'EMA{EMA_FAST}') > col(f'EMA{EMA_MEDIUM}'),
+                    col(f'EMA{EMA_MEDIUM}') > col(f'EMA{EMA_SLOW}'),
+                    col(f'EMA{EMA_SLOW}') > col(f'EMA{EMA_EXTENDED_1}'),
+                    col(f'EMA{EMA_EXTENDED_1}') > col(f'EMA{EMA_EXTENDED_2}'),
+                    col(STOCH_K_COL) <= STOCH_PULLBACK_THRESHOLD,
+                    col('RSI2') > RSI_BULLISH_CROSS_LEVEL,
+                    col('RSI2[1]') <= RSI_BULLISH_CROSS_LEVEL,
+                    col('earnings_release_next_date').not_between(now.timestamp(), future_14.timestamp())
+                )
                 .limit(500))
 
     def _fetch_data(self) -> pd.DataFrame:

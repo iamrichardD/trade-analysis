@@ -40,13 +40,14 @@
     - [x] Move EMA Stacking (8 > 21 > 34 > 55 > 89).
     - [x] Move Pullback (Stochastic K <= 40).
     - [x] Move RSI(2) condition (RSI(2) > 10).
-    - [ ] Move Earnings condition (Exclude if next 14 days) - Researching range-based server-side filter possibilities.
-    - [ ] Move Action Zone (Price within 1 ATR of EMA21 - Requires cross-column math, currently local only).
+    - [x] Move RSI(2) trigger (RSI2[1] <= 10).
+    - [x] Move Earnings condition: Use `.where(col('earnings_release_next_date').not_between(now, future_14))` to filter server-side.
+    - [ ] Move Action Zone (Price within 1 ATR of EMA21 - **Constraint:** Requires cross-column math (+/-), currently local only).
 
 ### Technical Manual Alignment & Refinement
-- [x] **Refine Indicator Periods**: Update query columns and logic to match the manual's specific periods:
-    - [x] Use `ADX(13)` instead of default (14).
-    - [x] Use `Stochastics(8, 3)` instead of default.
+- [x] **INVESTIGATE: Custom Indicator Periods**: Discovery: `EMA` supports custom periods, but `ADX` and `Stochastics` return `None` for non-standard periods in the current API version.
+    - *Decision:* Stick with default `ADX(14)` and `Stochastics(14,3,3)` as functional proxies until a calculation-capable API endpoint is identified.
+- [x] **Refine Indicator Periods**: Update query columns and logic to match the manual's specific periods (Currently using proxies - see investigation task).
 - [x] **Expand Trend Filters**: Add additional institutional "Lines-in-the-Sand" to the query:
     - [x] Add `Close > SMA50`.
     - [x] Add `Close > SMA100`.

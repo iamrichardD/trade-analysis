@@ -396,3 +396,58 @@ def test_filter_rsi_trigger() -> None:
     result = scanner._filter_rsi_trigger(df)
     assert len(result) == 1
     assert result.iloc[0]["name"] == "PASS"
+
+def test_should_include_all_filters_in_query() -> None:
+    """
+    Verifies that _build_query includes all required server-side filters.
+    Why: Ensures that we are maximizing the use of server-side filtering to reduce data transfer.
+    """
+    scanner = TaoBounceScanner(ScannerConfig(output_type="log"))
+    query = scanner._build_query()
+    
+    # Check that where clauses are present
+    # Query stores filters in q.query['filter']
+    filters = query.query['filter']
+    
+    # We expect several filters: type, subtype, market_cap, avg_volume, exchange, change, rel_vol, 
+    # ADX, SMA50, SMA100, SMA200, EMA8>21, EMA21>34, EMA34>55, EMA55>89, Stoch.K, RSI2, RSI2[1], earnings
+    # Total filters should be around 19
+    assert len(filters) >= 18
+
+    # Check for specific filters (by column name)
+    col_names_left = [f['left'] for f in filters]
+    col_names_right = [f['right'] for f in filters if isinstance(f['right'], str)]
+    all_cols = col_names_left + col_names_right
+
+    assert 'type' in all_cols
+    assert 'subtype' in all_cols
+    assert 'market_cap_basic' in all_cols
+    assert 'average_volume_30d_calc' in all_cols
+    assert 'exchange' in all_cols
+    assert 'change' in all_cols
+    assert 'relative_volume_10d_calc' in all_cols
+    assert ADX_COL in all_cols
+    assert 'SMA50' in all_cols
+    assert 'SMA100' in all_cols
+    assert 'SMA200' in all_cols
+    assert 'EMA8' in all_cols
+    assert 'EMA21' in all_cols
+    assert 'EMA34' in all_cols
+    assert 'EMA55' in all_cols
+    assert STOCH_K_COL in all_cols
+    assert 'RSI2' in all_cols
+    assert 'RSI2[1]' in all_cols
+    assert 'earnings_release_next_date' in all_cols
+
+    # Verify RSI trigger logic in query
+    rsi_filter = next(f for f in filters if f['left'] == 'RSI2')
+    assert rsi_filter['operation'] == 'greater'
+    assert rsi_filter['right'] == 10
+
+    rsi_prev_filter = next(f for f in filters if f['left'] == 'RSI2[1]')
+    assert rsi_prev_filter['operation'] == 'eless'
+    assert rsi_prev_filter['right'] == 10
+
+    # Verify earnings filter in query
+    earnings_filter = next(f for f in filters if f['left'] == 'earnings_release_next_date')
+    assert earnings_filter['operation'] == 'not_in_range'

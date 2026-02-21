@@ -97,3 +97,17 @@
     - [x] **Investigation:** Confirmed that `tao_bounce_scanner.py` does not use `argparse` or any other mechanism to parse `sys.argv`.
     - [x] **Plan:** Implement `argparse` in `tao_bounce_scanner.py` to correctly populate `ScannerConfig` from CLI arguments (e.g., `--direction`, `--output_type`, `--path`, `--sns_topic_arn`).
     - [x] **Verification:** Run `podman run ... --direction short` and verify that results show `SHORT` signals and bearish targets.
+
+## Future Enhancements
+
+### AI & Reporting (Gemini Gem Integration)
+- [x] **AI-Friendly Log Output**: Optimize CLI output for direct copy-pasting into LLMs (Gemini/ChatGPT) to generate structured trade reports.
+    - **Goal**: Enable a seamless workflow where scanner output can be pasted into a Gemini Gem to produce a "Trade Readiness Report" based on the `@gem/dao-of-trading-technical-manual.md`.
+    - **Format Shift**: Transition `LogWriter` from `df.to_string()` to `df.to_markdown()` for superior LLM table parsing.
+    - **Metadata Injection**: Include a "Scan Context" block (Markdown/YAML) containing:
+        - Timestamp of execution.
+        - Strategy Name (Bounce 2.0).
+        - Scan Direction (LONG/SHORT).
+        - Applied Thresholds (ADX, RSI levels, EMA periods).
+    - **Prompt Wrapper**: Prepend the output with a "Instruction Block" that tells the AI exactly how to process the data (e.g., "You are the Tao of Trading Analyst. Verify the following candidates against the Technical Manual...").
+    - **Validation Fields**: Ensure all raw inputs for calculated targets (EMA21, ATR) are explicitly visible so the AI can audit the math.

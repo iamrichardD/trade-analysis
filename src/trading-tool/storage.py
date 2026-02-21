@@ -33,7 +33,7 @@ class DataWriter(ABC):
     (CSV, Database, Log) to be swapped without changing the scanner logic.
     """
     @abstractmethod
-    def write(self, df: pd.DataFrame) -> None:
+    def write(self, df: pd.DataFrame, metadata: Optional[Dict[str, Any]] = None) -> None:
         """Writes the provided DataFrame to the configured output."""
         pass
 
@@ -45,7 +45,7 @@ class CSVFileWriter(DataWriter):
     def __init__(self, path: str) -> None:
         self.path = path
 
-    def write(self, df: pd.DataFrame) -> None:
+    def write(self, df: pd.DataFrame, metadata: Optional[Dict[str, Any]] = None) -> None:
         """Saves the DataFrame to a timestamped CSV file."""
         filename = f"tao_scan_{datetime.now().strftime('%Y%m%d')}.csv"
         full_path = f"{self.path}/{filename}"
@@ -54,12 +54,37 @@ class CSVFileWriter(DataWriter):
 
 class LogWriter(DataWriter):
     """
-    Writes scanner results to the system log.
-    Why: Useful for debugging, cloud logging streams, or quick manual checks in CLI.
+    Writes scanner results to the system log in an AI-friendly format.
+    Why: Optimized for direct copy-pasting into LLMs (Gemini/ChatGPT) for trade reporting.
     """
-    def write(self, df: pd.DataFrame) -> None:
-        """Logs the DataFrame as a string."""
-        logging.info("\n" + df.to_string())
+    def write(self, df: pd.DataFrame, metadata: Optional[Dict[str, Any]] = None) -> None:
+        """Logs the DataFrame as a Markdown table with AI context."""
+        if df.empty:
+            logging.info("No candidates found.")
+            return
+
+        now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        
+        # Build Metadata Block
+        meta_str = "### Scan Context\n"
+        meta_str += f"- **Timestamp**: {now}\n"
+        if metadata:
+            for key, value in metadata.items():
+                meta_str += f"- **{key.replace('_', ' ').title()}**: {value}\n"
+        meta_str += "\n"
+
+        # Build Prompt Wrapper
+        prompt = (
+            "**Instruction for AI Analyst**:\n"
+            "You are the Tao of Trading Analyst. Verify the following candidates against the "
+            "Technical Manual. Audit the target calculations (Conservative=2ATR from EMA21, "
+            "Stretch=3ATR from EMA21) and confirm the 'Action Zone' alignment. "
+            "Ensure validation fields are visible for math audit.\n\n"
+        )
+
+        # Combine everything
+        output = "\n" + meta_str + prompt + df.to_markdown(index=False)
+        logging.info(output)
 
 class SNSWriter(DataWriter):
     """
@@ -72,7 +97,7 @@ class SNSWriter(DataWriter):
         self.region_name = region_name
         self.sns = boto3.client("sns", region_name=region_name)
 
-    def write(self, df: pd.DataFrame) -> None:
+    def write(self, df: pd.DataFrame, metadata: Optional[Dict[str, Any]] = None) -> None:
         """Publishes the DataFrame results to the SNS topic as a Markdown table."""
         if df.empty:
             logging.info("No candidates found. Skipping email notification.")
@@ -84,6 +109,13 @@ class SNSWriter(DataWriter):
 
         # Convert DataFrame to Markdown table
         message = f"## Tao of Trading - Scan Results ({scan_date})\n\n"
+        
+        if metadata:
+            message += "### Scan Context\n"
+            for key, value in metadata.items():
+                message += f"- **{key.replace('_', ' ').title()}**: {value}\n"
+            message += "\n"
+
         message += df.to_markdown(index=False)
         message += "\n\n---\n*Sent via Tao Scanner Machine Account*"
 

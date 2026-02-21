@@ -24,11 +24,21 @@ def test_should_publish_to_sns_when_dataframe_is_not_empty(sns_setup):
     topic_arn = sns_setup
     writer = SNSWriter(topic_arn, "us-east-1")
     df = pd.DataFrame({"symbol": ["AAPL", "MSFT"], "close": [150.0, 400.0]})
+    metadata = {"strategy": "Test Strategy", "direction": "LONG"}
     
     with patch("logging.info") as mock_log:
-        writer.write(df)
-        # Check that the log message containing Message ID was printed
-        assert any("SNS notification sent. Message ID:" in str(call) for call in mock_log.call_args_list)
+        with patch.object(writer.sns, "publish") as mock_publish:
+            writer.write(df, metadata=metadata)
+            # Check that publish was called with the message containing metadata
+            call_args = mock_publish.call_args[1]
+            message = call_args["Message"]
+            assert "### Scan Context" in message
+            assert "- **Strategy**: Test Strategy" in message
+            assert "- **Direction**: LONG" in message
+            assert df.to_markdown(index=False) in message
+            
+            # Check that log for success was triggered
+            assert any("SNS notification sent. Message ID:" in str(call) for call in mock_log.call_args_list)
 
 def test_should_skip_publish_when_dataframe_is_empty(sns_setup):
     """

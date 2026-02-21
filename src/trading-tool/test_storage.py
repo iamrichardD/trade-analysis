@@ -24,14 +24,22 @@ def test_csv_file_writer(sample_df: pd.DataFrame) -> None:
 
 def test_log_writer(sample_df: pd.DataFrame) -> None:
     """
-    Verifies that LogWriter logs the data to the system logger.
-    Why: To ensure data is visible in logs (stdout/stderr) when 'log' output is selected.
+    Verifies that LogWriter logs the data to the system logger in AI-friendly Markdown.
+    Why: Ensures the output is correctly formatted for LLM consumption.
     """
     with patch("logging.info") as mock_log_info:
         writer = LogWriter()
-        writer.write(sample_df)
-        # LogWriter adds a newline prefix for better formatting in logs
-        mock_log_info.assert_called_once_with("\n" + sample_df.to_string())
+        metadata = {"strategy": "Test", "direction": "LONG"}
+        writer.write(sample_df, metadata=metadata)
+        
+        args, _ = mock_log_info.call_args
+        log_content = args[0]
+        
+        assert "### Scan Context" in log_content
+        assert "- **Strategy**: Test" in log_content
+        assert "- **Direction**: LONG" in log_content
+        assert "**Instruction for AI Analyst**:" in log_content
+        assert sample_df.to_markdown(index=False) in log_content
 
 def test_get_writer_file() -> None:
     """

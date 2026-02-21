@@ -287,6 +287,20 @@ class TaoBounceScanner:
                 final_df['target_conservative'] = final_df[f'EMA{EMA_MEDIUM}'] - (2 * final_df['ATR'])
                 final_df['target_stretch'] = final_df[f'EMA{EMA_MEDIUM}'] - (3 * final_df['ATR'])
 
+            # Metadata for AI reporting
+            metadata = {
+                "strategy": "Bounce 2.0",
+                "direction": direction.upper(),
+                "thresholds": (
+                    f"ADX >= {MIN_ADX}, "
+                    f"RSI2 Bullish > {RSI_BULLISH_CROSS_LEVEL}, "
+                    f"RSI2 Bearish < {RSI_BEARISH_CROSS_LEVEL}, "
+                    f"Stoch.K Bullish <= {STOCH_PULLBACK_THRESHOLD_BULLISH}, "
+                    f"Stoch.K Bearish >= {STOCH_PULLBACK_THRESHOLD_BEARISH}, "
+                    f"EMA Stack: {EMA_FAST}>{EMA_MEDIUM}>{EMA_SLOW}>{EMA_EXTENDED_1}>{EMA_EXTENDED_2}"
+                )
+            }
+
             output_columns = [
                 'name', 'signal_direction', 'close', 
                 'target_conservative', 'target_stretch',
@@ -301,7 +315,7 @@ class TaoBounceScanner:
             cols_to_select = [c for c in output_columns if c in final_df.columns]
             final_df = final_df[cols_to_select]
             
-            self.writer.write(final_df)
+            self.writer.write(final_df, metadata=metadata)
 
         except Exception as e:
             logging.error(f"Error during scan: {e}")

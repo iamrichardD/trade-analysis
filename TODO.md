@@ -63,20 +63,20 @@
 - [x] **Actionable Targets**: Calculate and include Conservative (2 ATR) and Stretch (3 ATR) targets in the reporting layer output.
 
 ### AWS SNS Email Notifications (Infrastructure & Code)
-- [ ] **Infrastructure (Terraform)**:
-    - [ ] Create `aws_sns_topic` for scanner alerts (e.g., `tao-scanner-alerts`).
-    - [ ] Create `aws_sns_topic_subscription` resources for configurable email list.
-    - [ ] Create `aws_iam_user` for the scanner machine account.
-    - [ ] Create `aws_iam_policy` with `sns:Publish` permissions restricted specifically to the topic ARN (DevSecOps Least Privilege).
-    - [ ] Create `aws_iam_access_key` for machine account authentication and instructions for secure retrieval.
-- [ ] **Software Architecture (SNS Integration)**:
-    - [ ] Add `boto3` and `types-boto3` to `requirements.txt`.
-    - [ ] Update `ScannerConfig` in `storage.py` with `sns_topic_arn`, `aws_region`, and `email` output type.
-    - [ ] Implement `SNSWriter(DataWriter)` in `storage.py` to format (DataFrame to Markdown) and publish results via SNS.
-    - [ ] Update `get_writer` factory in `storage.py` to support the `email` output type.
-- [ ] **DevSecOps & Validation**:
-    - [ ] Update `Containerfile` and `Containerfile.test` to include `boto3` in the runtime and test environments.
-    - [ ] Create `test_sns_writer.py` using `moto` to verify notification logic without making live AWS calls.
-    - [ ] Document secure credential injection workflow via Podman secrets or environment files.
-- [ ] **Documentation**:
-    - [ ] Provide step-by-step instructions for subscription confirmation and Terraform deployment.
+- [x] **Infrastructure (Terraform)**:
+    - [x] Create `aws_sns_topic` for scanner alerts (e.g., `tao-scanner-alerts`).
+    - [x] Create `aws_sns_topic_subscription` resources for configurable email list.
+    - [x] Create `aws_iam_user` for the scanner machine account.
+    - [x] Create `aws_iam_policy` with `sns:Publish` permissions restricted specifically to the topic ARN (DevSecOps Least Privilege).
+    - [x] Create `aws_iam_access_key` for machine account authentication and instructions for secure retrieval.
+- [x] **Software Architecture (SNS Integration)**:
+    - [x] Add `boto3` and `types-boto3` to `requirements.txt`.
+    - [x] Update `ScannerConfig` in `storage.py` with `sns_topic_arn`, `aws_region`, and `email` output type.
+    - [x] Implement `SNSWriter(DataWriter)` in `storage.py` to format (DataFrame to Markdown) and publish results via SNS.
+    - [x] Update `get_writer` factory in `storage.py` to support the `email` output type.
+- [x] **DevSecOps & Validation**:
+    - [x] Update `Containerfile` and `Containerfile.test` to include `boto3` in the runtime and test environments.
+    - [x] Create `test_sns_writer.py` using `moto` to verify notification logic without making live AWS calls.
+    - [x] Document secure credential injection workflow via Podman secrets or environment files.
+- [x] **Documentation**:
+    - [x] Provide step-by-step instructions for subscription confirmation and Terraform deployment.

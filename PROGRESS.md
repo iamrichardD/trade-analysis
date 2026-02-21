@@ -16,6 +16,12 @@
 - [x] Refactored `_build_query` to collect and apply all filters in a single call, preventing filter overwriting.
 - [x] Updated and expanded test suite (now 33 tests) to cover Bearish signals and target calculations.
 - [x] Verified all tests pass in Podman environment.
+- [x] Created new feature branch `feature/sns-notifications` to implement AWS SNS notifications.
+- [x] Implemented Terraform infrastructure for AWS SNS topic, subscriptions, and IAM machine account.
+- [x] Updated `requirements.txt` with `boto3`, `types-boto3`, and `tabulate`.
+- [x] Updated `storage.py` with `SNSWriter` and updated `ScannerConfig` to support email notifications.
+- [x] Created `test_sns_writer.py` and verified all tests pass in Podman (38 tests total).
+- [x] Updated `Containerfile` and `Containerfile.test` for AWS SDK support.
 
 ## 2026-02-20
 - [x] Initialized `TODO.md` and `PROGRESS.md`.

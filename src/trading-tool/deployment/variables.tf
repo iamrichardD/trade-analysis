@@ -19,3 +19,15 @@ variable "ssh_public_key" {
   description = "The SSH public key string for LXC access"
   type        = string
 }
+
+variable "aws_region" {
+  description = "AWS region for SNS topic"
+  type        = string
+  default     = "us-east-1"
+}
+
+variable "alert_emails" {
+  description = "List of email addresses to subscribe to scanner alerts"
+  type        = list(string)
+  default     = []
+}

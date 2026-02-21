@@ -4,6 +4,10 @@ terraform {
       source  = "bpg/proxmox"
       version = "0.78.2"
     }
+    aws = {
+      source  = "hashicorp/aws"
+      version = "~> 5.0"
+    }
   }
 }
 
@@ -11,6 +15,55 @@ provider "proxmox" {
   endpoint  = "https://${var.proxmox_endpoint}:8006/"
   api_token = "${var.proxmox_token_id}=${var.proxmox_token_secret}"
   insecure  = true
+}
+
+provider "aws" {
+  region = var.aws_region
+}
+
+# SNS Infrastructure for Scanner Alerts
+resource "aws_sns_topic" "scanner_alerts" {
+  name = "tao-scanner-alerts"
+}
+
+resource "aws_sns_topic_subscription" "email_subscription" {
+  for_each  = toset(var.alert_emails)
+  topic_arn = aws_sns_topic.scanner_alerts.arn
+  protocol  = "email"
+  endpoint  = each.value
+}
+
+# IAM Machine Account for Tao Scanner
+resource "aws_iam_user" "tao_scanner" {
+  name = "tao-scanner-machine-account"
+  tags = {
+    System = "Trading Analysis Engine"
+  }
+}
+
+resource "aws_iam_access_key" "tao_scanner" {
+  user = aws_iam_user.tao_scanner.name
+}
+
+resource "aws_iam_policy" "sns_publish" {
+  name        = "TaoScannerSNSPublishPolicy"
+  description = "Allows publishing specifically to the tao-scanner-alerts SNS topic"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action   = ["sns:Publish"]
+        Effect   = "Allow"
+        Resource = [aws_sns_topic.scanner_alerts.arn]
+      }
+    ]
+  })
+}
+
+resource "aws_iam_user_policy_attachment" "tao_scanner_publish" {
+  user       = aws_iam_user.tao_scanner.name
+  policy_arn = aws_iam_policy.sns_publish.arn
 }
 
 resource "proxmox_virtual_environment_container" "tao_scanner_lxc" {

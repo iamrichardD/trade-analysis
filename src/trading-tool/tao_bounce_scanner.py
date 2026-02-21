@@ -11,8 +11,10 @@ from storage import get_writer, ConfigurationError, ScannerConfig, DataWriter
 MIN_MARKET_CAP: int = 1_000_000_000
 MIN_AVG_VOLUME: int = 500_000
 MIN_ADX: int = 20
-STOCH_PULLBACK_THRESHOLD: int = 40
+STOCH_PULLBACK_THRESHOLD_BULLISH: int = 40
+STOCH_PULLBACK_THRESHOLD_BEARISH: int = 60
 RSI_BULLISH_CROSS_LEVEL: int = 10
+RSI_BEARISH_CROSS_LEVEL: int = 90
 EARNINGS_BUFFER_DAYS: int = 14
 EMA_FAST: int = 8
 EMA_MEDIUM: int = 21
@@ -37,44 +39,68 @@ class TaoBounceScanner:
         self.config = config
         self.writer: DataWriter = get_writer(config)
 
+    def _get_direction(self) -> str:
+        """Helper to get direction from config, defaulting to 'long'."""
+        if isinstance(self.config, dict):
+            return self.config.get("direction", "long")
+        return self.config.direction
+
     def _build_query(self) -> Query:
         """
-        Defines the initial query for liquid US common stocks with strong bullish trends, 
-        perfect EMA stacking, price pullback, and a bullish RSI(2) state.
-        Why: We only want to trade liquid stocks (high volume/cap) with orderly trends 
-        that are in a pullback (Stoch.K <= 40) and starting to show momentum (RSI2 > 10).
-        Moving these filters server-side ensures the results are high-quality candidates, 
-        overcoming the default 50-row limit.
+        Defines the initial query for liquid US common stocks meeting Bounce 2.0 criteria.
+        Why: We only want to trade liquid stocks with orderly trends (EMA stacked)
+        that are in a pullback and starting to show momentum.
         """
         now = datetime.now()
         future_14 = now + timedelta(days=EARNINGS_BUFFER_DAYS)
+        direction = self._get_direction()
+
+        filters = [
+            col('type').isin(['stock']),
+            col('subtype').isin(['common']),
+            col('market_cap_basic') > MIN_MARKET_CAP,
+            col('average_volume_30d_calc') > MIN_AVG_VOLUME,
+            col('exchange').isin(['NYSE', 'NASDAQ']),
+            col('relative_volume_10d_calc') > 1.0,
+            col(ADX_COL) >= MIN_ADX,
+            col('earnings_release_next_date').not_between(now.timestamp(), future_14.timestamp())
+        ]
+
+        if direction == "long":
+            filters.extend([
+                col('change') > 0,
+                col('close') > col(f'SMA{SMA_INSTITUTIONAL_50}'),
+                col('close') > col(f'SMA{SMA_INSTITUTIONAL_100}'),
+                col('close') > col(f'SMA{SMA_TREND}'),
+                col(f'EMA{EMA_FAST}') > col(f'EMA{EMA_MEDIUM}'),
+                col(f'EMA{EMA_MEDIUM}') > col(f'EMA{EMA_SLOW}'),
+                col(f'EMA{EMA_SLOW}') > col(f'EMA{EMA_EXTENDED_1}'),
+                col(f'EMA{EMA_EXTENDED_1}') > col(f'EMA{EMA_EXTENDED_2}'),
+                col(STOCH_K_COL) <= STOCH_PULLBACK_THRESHOLD_BULLISH,
+                col('RSI2') > RSI_BULLISH_CROSS_LEVEL,
+                col('RSI2[1]') <= RSI_BULLISH_CROSS_LEVEL
+            ])
+        else: # short
+            filters.extend([
+                col('change') < 0,
+                col('close') < col(f'SMA{SMA_INSTITUTIONAL_50}'),
+                col('close') < col(f'SMA{SMA_INSTITUTIONAL_100}'),
+                col('close') < col(f'SMA{SMA_TREND}'),
+                col(f'EMA{EMA_FAST}') < col(f'EMA{EMA_MEDIUM}'),
+                col(f'EMA{EMA_MEDIUM}') < col(f'EMA{EMA_SLOW}'),
+                col(f'EMA{EMA_SLOW}') < col(f'EMA{EMA_EXTENDED_1}'),
+                col(f'EMA{EMA_EXTENDED_1}') < col(f'EMA{EMA_EXTENDED_2}'),
+                col(STOCH_K_COL) >= STOCH_PULLBACK_THRESHOLD_BEARISH,
+                col('RSI2') < RSI_BEARISH_CROSS_LEVEL,
+                col('RSI2[1]') >= RSI_BEARISH_CROSS_LEVEL
+            ])
 
         return (Query().set_markets('america')
                 .select('name', 'close', 'EMA8', 'EMA21', 'EMA34', 'EMA55', 'EMA89', 
                         'SMA50', 'SMA100', 'SMA200', 
                         'ATR', ADX_COL, STOCH_K_COL, 'relative_volume_10d_calc', 'change',
                         'RSI2', 'RSI2[1]', 'earnings_release_next_date')
-                .where(
-                    col('type').isin(['stock']),
-                    col('subtype').isin(['common']),
-                    col('market_cap_basic') > MIN_MARKET_CAP,
-                    col('average_volume_30d_calc') > MIN_AVG_VOLUME,
-                    col('exchange').isin(['NYSE', 'NASDAQ']),
-                    col('change') > 0,
-                    col('relative_volume_10d_calc') > 1.0,
-                    col(ADX_COL) >= MIN_ADX,
-                    col('close') > col(f'SMA{SMA_INSTITUTIONAL_50}'),
-                    col('close') > col(f'SMA{SMA_INSTITUTIONAL_100}'),
-                    col('close') > col(f'SMA{SMA_TREND}'),
-                    col(f'EMA{EMA_FAST}') > col(f'EMA{EMA_MEDIUM}'),
-                    col(f'EMA{EMA_MEDIUM}') > col(f'EMA{EMA_SLOW}'),
-                    col(f'EMA{EMA_SLOW}') > col(f'EMA{EMA_EXTENDED_1}'),
-                    col(f'EMA{EMA_EXTENDED_1}') > col(f'EMA{EMA_EXTENDED_2}'),
-                    col(STOCH_K_COL) <= STOCH_PULLBACK_THRESHOLD,
-                    col('RSI2') > RSI_BULLISH_CROSS_LEVEL,
-                    col('RSI2[1]') <= RSI_BULLISH_CROSS_LEVEL,
-                    col('earnings_release_next_date').not_between(now.timestamp(), future_14.timestamp())
-                )
+                .where(*filters)
                 .limit(500))
 
     def _fetch_data(self) -> pd.DataFrame:
@@ -139,30 +165,48 @@ class TaoBounceScanner:
 
     def _filter_trend_strength(self, df: pd.DataFrame) -> pd.DataFrame:
         """
-        Filters for stocks in a strong trend (ADX > 20) and above the 200 SMA.
-        Includes institutional support checks (50 and 100 SMAs).
+        Filters for stocks in a strong trend (ADX > 20) and above/below the relevant SMAs.
         """
-        mask = (df[ADX_COL] >= MIN_ADX) & \
-               (df['close'] > df[f'SMA{SMA_TREND}']) & \
-               (df['close'] > df[f'SMA{SMA_INSTITUTIONAL_50}']) & \
-               (df['close'] > df[f'SMA{SMA_INSTITUTIONAL_100}'])
+        direction = self._get_direction()
+        mask = (df[ADX_COL] >= MIN_ADX)
+        
+        if direction == "long":
+            mask &= (df['close'] > df[f'SMA{SMA_TREND}']) & \
+                    (df['close'] > df[f'SMA{SMA_INSTITUTIONAL_50}']) & \
+                    (df['close'] > df[f'SMA{SMA_INSTITUTIONAL_100}'])
+        else:
+            mask &= (df['close'] < df[f'SMA{SMA_TREND}']) & \
+                    (df['close'] < df[f'SMA{SMA_INSTITUTIONAL_50}']) & \
+                    (df['close'] < df[f'SMA{SMA_INSTITUTIONAL_100}'])
+                    
         return df[mask]
 
     def _filter_ema_stacking(self, df: pd.DataFrame) -> pd.DataFrame:
         """
-        Filters for 'Perfect' EMA stacking (8 > 21 > 34 > 55 > 89).
+        Filters for 'Perfect' EMA stacking (8 > 21 > 34 > 55 > 89 for long).
         """
-        mask = (df[f'EMA{EMA_FAST}'] > df[f'EMA{EMA_MEDIUM}']) & \
-               (df[f'EMA{EMA_MEDIUM}'] > df[f'EMA{EMA_SLOW}']) & \
-               (df[f'EMA{EMA_SLOW}'] > df[f'EMA{EMA_EXTENDED_1}']) & \
-               (df[f'EMA{EMA_EXTENDED_1}'] > df[f'EMA{EMA_EXTENDED_2}'])
+        direction = self._get_direction()
+        if direction == "long":
+            mask = (df[f'EMA{EMA_FAST}'] > df[f'EMA{EMA_MEDIUM}']) & \
+                   (df[f'EMA{EMA_MEDIUM}'] > df[f'EMA{EMA_SLOW}']) & \
+                   (df[f'EMA{EMA_SLOW}'] > df[f'EMA{EMA_EXTENDED_1}']) & \
+                   (df[f'EMA{EMA_EXTENDED_1}'] > df[f'EMA{EMA_EXTENDED_2}'])
+        else:
+            mask = (df[f'EMA{EMA_FAST}'] < df[f'EMA{EMA_MEDIUM}']) & \
+                   (df[f'EMA{EMA_MEDIUM}'] < df[f'EMA{EMA_SLOW}']) & \
+                   (df[f'EMA{EMA_SLOW}'] < df[f'EMA{EMA_EXTENDED_1}']) & \
+                   (df[f'EMA{EMA_EXTENDED_1}'] < df[f'EMA{EMA_EXTENDED_2}'])
         return df[mask]
 
     def _filter_pullback(self, df: pd.DataFrame) -> pd.DataFrame:
         """
-        Filters for stocks that have pulled back (Stochastics <= 40).
+        Filters for stocks that have pulled back (Stochastics threshold).
         """
-        return df[df[STOCH_K_COL] <= STOCH_PULLBACK_THRESHOLD]
+        direction = self._get_direction()
+        if direction == "long":
+            return df[df[STOCH_K_COL] <= STOCH_PULLBACK_THRESHOLD_BULLISH]
+        else:
+            return df[df[STOCH_K_COL] >= STOCH_PULLBACK_THRESHOLD_BEARISH]
 
     def _filter_action_zone(self, df: pd.DataFrame) -> pd.DataFrame:
         """
@@ -197,12 +241,16 @@ class TaoBounceScanner:
 
     def _filter_rsi_trigger(self, df: pd.DataFrame) -> pd.DataFrame:
         """
-        Filters for the RSI(2) bullish trigger (crossed above 10).
+        Filters for the RSI(2) trigger (crossed above 10 for long, below 90 for short).
         """
         if 'RSI2' not in df.columns or 'RSI2[1]' not in df.columns:
             return df
             
-        mask = (df['RSI2[1]'] <= RSI_BULLISH_CROSS_LEVEL) & (df['RSI2'] > RSI_BULLISH_CROSS_LEVEL)
+        direction = self._get_direction()
+        if direction == "long":
+            mask = (df['RSI2[1]'] <= RSI_BULLISH_CROSS_LEVEL) & (df['RSI2'] > RSI_BULLISH_CROSS_LEVEL)
+        else:
+            mask = (df['RSI2[1]'] >= RSI_BEARISH_CROSS_LEVEL) & (df['RSI2'] < RSI_BEARISH_CROSS_LEVEL)
         return df[mask]
 
     def run_scan(self) -> None:
@@ -224,9 +272,23 @@ class TaoBounceScanner:
                 logging.info("No stocks currently meet the Bounce 2.0 criteria after filtering.")
                 return
 
-            # Final Selection for reporting
+            # Final Selection & Metadata enhancement
+            direction = self._get_direction()
+            final_df = filtered_df.copy()
+            final_df['signal_direction'] = direction.upper()
+            
+            # Calculate Targets per Technical Manual
+            # Conservative: 2 ATR from EMA21, Stretch: 3 ATR from EMA21
+            if direction == "long":
+                final_df['target_conservative'] = final_df[f'EMA{EMA_MEDIUM}'] + (2 * final_df['ATR'])
+                final_df['target_stretch'] = final_df[f'EMA{EMA_MEDIUM}'] + (3 * final_df['ATR'])
+            else:
+                final_df['target_conservative'] = final_df[f'EMA{EMA_MEDIUM}'] - (2 * final_df['ATR'])
+                final_df['target_stretch'] = final_df[f'EMA{EMA_MEDIUM}'] - (3 * final_df['ATR'])
+
             output_columns = [
-                'name', 'close', 
+                'name', 'signal_direction', 'close', 
+                'target_conservative', 'target_stretch',
                 f'SMA{SMA_INSTITUTIONAL_50}', f'SMA{SMA_INSTITUTIONAL_100}', f'SMA{SMA_TREND}', 
                 f'EMA{EMA_FAST}', f'EMA{EMA_MEDIUM}', f'EMA{EMA_SLOW}', 
                 f'EMA{EMA_EXTENDED_1}', f'EMA{EMA_EXTENDED_2}', 
@@ -235,8 +297,8 @@ class TaoBounceScanner:
             ]
             
             # Ensure columns exist before selecting
-            cols_to_select = [c for c in output_columns if c in filtered_df.columns]
-            final_df = filtered_df[cols_to_select].copy()
+            cols_to_select = [c for c in output_columns if c in final_df.columns]
+            final_df = final_df[cols_to_select]
             
             self.writer.write(final_df)
 

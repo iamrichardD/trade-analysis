@@ -17,14 +17,14 @@ def mock_get_scanner_data() -> Generator[MagicMock, None, None]:
 
 def get_default_stock_data() -> Dict[str, Any]:
     """
-    Returns a dictionary representing a stock that meets ALL Bounce 2.0 criteria.
+    Returns a dictionary representing a stock that meets ALL Bullish Bounce 2.0 criteria.
     Why: specific tests can modify just one attribute to verify individual filter logic.
     """
     # Set default earnings date to far future (safe)
     safe_earnings_date = (datetime.now() + timedelta(days=100)).timestamp()
     
     return {
-        "name": "GOOD_STOCK",
+        "name": "GOOD_STOCK_LONG",
         "close": 700.0,
         "SMA50": 650.0,
         "SMA100": 620.0,
@@ -41,6 +41,35 @@ def get_default_stock_data() -> Dict[str, Any]:
         "change": 1.2,
         "RSI2": 15.0,         # Bullish Trigger: Curr > 10
         "RSI2[1]": 5.0,       # Bullish Trigger: Prev <= 10
+        "earnings_release_next_date": safe_earnings_date
+    }
+
+def get_bearish_stock_data() -> Dict[str, Any]:
+    """
+    Returns a dictionary representing a stock that meets ALL Bearish Bounce 2.0 criteria.
+    Why: specific tests can modify just one attribute to verify individual short filter logic.
+    """
+    # Set default earnings date to far future (safe)
+    safe_earnings_date = (datetime.now() + timedelta(days=100)).timestamp()
+    
+    return {
+        "name": "GOOD_STOCK_SHORT",
+        "close": 500.0,
+        "SMA50": 550.0,
+        "SMA100": 580.0,
+        "SMA200": 600.0,
+        ADX_COL: 25.0,
+        "EMA8": 520.0,
+        "EMA21": 530.0,
+        "EMA34": 540.0,
+        "EMA55": 550.0,
+        "EMA89": 560.0,
+        STOCH_K_COL: 70.0,    # Pullback for short is >= 60
+        "ATR": 30.0,
+        "relative_volume_10d_calc": 1.5,
+        "change": -1.2,
+        "RSI2": 85.0,         # Bearish Trigger: Curr < 90
+        "RSI2[1]": 95.0,      # Bearish Trigger: Prev >= 90
         "earnings_release_next_date": safe_earnings_date
     }
 
@@ -382,16 +411,69 @@ def test_filter_earnings() -> None:
     assert "PASS" in result["name"].values
     assert "PASS_NONE" in result["name"].values
 
-def test_filter_rsi_trigger() -> None:
+def test_should_calculate_targets_for_long_setup(mock_get_scanner_data: MagicMock) -> None:
     """
-    Tests _filter_rsi_trigger in isolation.
-    Why: Validates the RSI(2) bullish cross signal.
+    Verifies that target_conservative (EMA21 + 2*ATR) and target_stretch (EMA21 + 3*ATR) 
+    are correctly calculated for long setups.
     """
-    scanner = TaoBounceScanner(ScannerConfig(output_type="log"))
+    stock_data = get_default_stock_data()
+    # EMA21=670, ATR=30. targets: 670+60=730, 670+90=760
+    mock_data = [None, [stock_data]]
+    mock_get_scanner_data.return_value = mock_data
+
+    with patch("tao_bounce_scanner.get_writer") as mock_get_writer:
+        mock_writer = MagicMock()
+        mock_get_writer.return_value = mock_writer
+        run_tao_of_trading_scan(ScannerConfig(output_type="log", direction="long"))
+        
+        args, _ = mock_writer.write.call_args
+        df = args[0]
+        assert df.iloc[0]['target_conservative'] == 730.0
+        assert df.iloc[0]['target_stretch'] == 760.0
+        assert df.iloc[0]['signal_direction'] == "LONG"
+
+def test_should_calculate_targets_for_short_setup(mock_get_scanner_data: MagicMock) -> None:
+    """
+    Verifies that targets are correctly calculated for short setups (EMA21 - N*ATR).
+    """
+    stock_data = get_bearish_stock_data()
+    # EMA21=530, ATR=30. targets: 530-60=470, 530-90=440
+    mock_data = [None, [stock_data]]
+    mock_get_scanner_data.return_value = mock_data
+
+    with patch("tao_bounce_scanner.get_writer") as mock_get_writer:
+        mock_writer = MagicMock()
+        mock_get_writer.return_value = mock_writer
+        run_tao_of_trading_scan(ScannerConfig(output_type="log", direction="short"))
+        
+        args, _ = mock_writer.write.call_args
+        df = args[0]
+        assert df.iloc[0]['target_conservative'] == 470.0
+        assert df.iloc[0]['target_stretch'] == 440.0
+        assert df.iloc[0]['signal_direction'] == "SHORT"
+
+def test_filter_trend_strength_short() -> None:
+    """
+    Tests _filter_trend_strength for short direction.
+    """
+    scanner = TaoBounceScanner(ScannerConfig(output_type="log", direction="short"))
     df = pd.DataFrame([
-        {"name": "PASS", "RSI2[1]": 5, "RSI2": 15},   # Crossed up
-        {"name": "FAIL_LOW", "RSI2[1]": 5, "RSI2": 8}, # Still low
-        {"name": "FAIL_HIGH", "RSI2[1]": 15, "RSI2": 20}, # Already high
+        {"name": "PASS", "close": 90, "SMA200": 100, "SMA100": 110, "SMA50": 120, ADX_COL: 25},
+        {"name": "FAIL_SMA200", "close": 110, "SMA200": 100, "SMA100": 120, "SMA50": 130, ADX_COL: 25},
+    ])
+    result = scanner._filter_trend_strength(df)
+    assert len(result) == 1
+    assert result.iloc[0]["name"] == "PASS"
+
+def test_filter_rsi_trigger_short() -> None:
+    """
+    Tests _filter_rsi_trigger for short direction (crossed BELOW 90).
+    """
+    scanner = TaoBounceScanner(ScannerConfig(output_type="log", direction="short"))
+    df = pd.DataFrame([
+        {"name": "PASS", "RSI2[1]": 95, "RSI2": 85},   # Crossed down
+        {"name": "FAIL_HIGH", "RSI2[1]": 95, "RSI2": 92}, # Still high
+        {"name": "FAIL_LOW", "RSI2[1]": 85, "RSI2": 80}, # Already low
     ])
     result = scanner._filter_rsi_trigger(df)
     assert len(result) == 1
@@ -411,8 +493,8 @@ def test_should_include_all_filters_in_query() -> None:
     
     # We expect several filters: type, subtype, market_cap, avg_volume, exchange, change, rel_vol, 
     # ADX, SMA50, SMA100, SMA200, EMA8>21, EMA21>34, EMA34>55, EMA55>89, Stoch.K, RSI2, RSI2[1], earnings
-    # Total filters should be around 19
-    assert len(filters) >= 18
+    # Total filters should be 19
+    assert len(filters) == 19
 
     # Check for specific filters (by column name)
     col_names_left = [f['left'] for f in filters]
@@ -451,3 +533,27 @@ def test_should_include_all_filters_in_query() -> None:
     # Verify earnings filter in query
     earnings_filter = next(f for f in filters if f['left'] == 'earnings_release_next_date')
     assert earnings_filter['operation'] == 'not_in_range'
+
+def test_should_include_all_short_filters_in_query() -> None:
+    """
+    Verifies that _build_query includes all required server-side filters for SHORT direction.
+    """
+    scanner = TaoBounceScanner(ScannerConfig(output_type="log", direction="short"))
+    query = scanner._build_query()
+    filters = query.query['filter']
+    
+    assert len(filters) == 19
+
+    # Verify RSI trigger logic for short (opposite of long)
+    rsi_filter = next(f for f in filters if f['left'] == 'RSI2')
+    assert rsi_filter['operation'] == 'less'
+    assert rsi_filter['right'] == 90
+
+    rsi_prev_filter = next(f for f in filters if f['left'] == 'RSI2[1]')
+    assert rsi_prev_filter['operation'] == 'egreater'
+    assert rsi_prev_filter['right'] == 90
+
+    # Verify EMA stacking logic for short (opposite of long)
+    ema8_filter = next(f for f in filters if f['left'] == 'EMA8')
+    assert ema8_filter['operation'] == 'less'
+    assert ema8_filter['right'] == 'EMA21'

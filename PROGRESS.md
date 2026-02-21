@@ -1,5 +1,22 @@
 # PROGRESS
 
+> [!IMPORTANT]
+> **MAINTENANCE PROTOCOL:** This file is APPEND-ONLY for new sessions. Do NOT overwrite previous session entries. Track the completion of items from `TODO.md` by date.
+
+## 2026-02-21 (Current Session)
+- [x] Verified project state and test suite (29 tests passing).
+- [x] Investigated cross-column arithmetic support in `tradingview-screener` library. **Discovery:** Arithmetic between `Column` objects (e.g., `col('close') - col('EMA21')`) is NOT supported in version 2.5.0.
+- [x] Confirmed that `Action Zone` filter must remain local due to library constraints.
+- [x] Investigated custom indicator periods (`ADX13`, `Stoch.K[8]`). **Discovery:** API accepts these field names but returns `None`. Re-confirmed standard proxies are necessary.
+- [x] Enhanced `TaoBounceScanner` with actionable metadata:
+    - [x] Calculated "Conservative Target" (EMA21 +/- 2 ATR) and "Stretch Target" (EMA21 +/- 3 ATR) per technical manual.
+    - [x] Added `signal_direction` column to output.
+    - [x] Added support for "Bearish" Bounce 2.0 setups (Short side) to fully align with technical manual.
+- [x] Refined `ScannerConfig` to support directional scanning.
+- [x] Refactored `_build_query` to collect and apply all filters in a single call, preventing filter overwriting.
+- [x] Updated and expanded test suite (now 33 tests) to cover Bearish signals and target calculations.
+- [x] Verified all tests pass in Podman environment.
+
 ## 2026-02-20
 - [x] Initialized `TODO.md` and `PROGRESS.md`.
 - [x] Researched codebase and technical manual.

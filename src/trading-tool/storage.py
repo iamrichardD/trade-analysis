@@ -20,6 +20,7 @@ class ScannerConfig:
     and ensuring all necessary config values are present.
     """
     output_type: Literal["file", "log"]
+    direction: Literal["long", "short"] = "long"
     path: Optional[str] = None
 
 class DataWriter(ABC):
@@ -65,9 +66,11 @@ def get_writer(config: Union[ScannerConfig, Dict[str, Any]]) -> DataWriter:
     """
     if isinstance(config, dict):
         output_type = config.get("output_type")
+        direction = config.get("direction", "long")
         path = config.get("path")
     else:
         output_type = config.output_type
+        direction = config.direction
         path = config.path
 
     if not output_type:

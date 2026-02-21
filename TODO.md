@@ -1,5 +1,8 @@
 # TODO
 
+> [!IMPORTANT]
+> **MAINTENANCE PROTOCOL:** This file is APPEND-ONLY for new tasks. Do NOT overwrite or delete previous tasks. Mark completed items with `[x]`. New features or bugs found must be added as new items at the bottom of the relevant section or in a new session block.
+
 - [x] Study Python code and identify improvement opportunities.
 - [x] Document improvement opportunities in `TODO.md`.
 - [x] Implement improvements identified.
@@ -16,6 +19,8 @@
 ### Trading Logic (Bounce 2.0)
 - [x] **Implement RSI(2) Trigger**: Add the final bullish/bearish entry trigger based on RSI(2) (crossing back above 10/below 90).
 - [x] **Negative Constraint - Earnings Check**: Implement a check to exclude stocks with an earnings announcement within the next 14 days. This is a critical risk rule from `GEMINI.md`.
+- [x] **Support Bearish Setup**: Add logic for Bearish Bounce 2.0 (Bearish Stacked EMAs, Stoch.K >= 60, RSI2 crossing below 90).
+- [x] **Target Calculations**: Add `target_conservative` (2 ATR) and `target_stretch` (3 ATR) to the output for better actionability.
 
 ### Quality & Standards
 - [x] **Strong Typing**: Add comprehensive type hints (Mypy compliant) to all functions, variables, and parameters in:
@@ -35,14 +40,14 @@
 
 ### Query Optimization & Scaling
 - [x] **Address Default Result Limit (50)**: Increase the `limit` in the TradingView query to ensure a larger starting candidate pool. (Increased to 500).
-- [ ] **Move Filters Server-side**: Progressively move local filters to the TradingView `Query().where(...)` to reduce data transfer and over-filtering risks:
+- [x] **Move Filters Server-side**: Progressively move local filters to the TradingView `Query().where(...)` to reduce data transfer and over-filtering risks:
     - [x] Move Trend & Strength (ADX >= 20, Close > SMA200).
     - [x] Move EMA Stacking (8 > 21 > 34 > 55 > 89).
     - [x] Move Pullback (Stochastic K <= 40).
     - [x] Move RSI(2) condition (RSI(2) > 10).
     - [x] Move RSI(2) trigger (RSI2[1] <= 10).
     - [x] Move Earnings condition: Use `.where(col('earnings_release_next_date').not_between(now, future_14))` to filter server-side.
-    - [ ] Move Action Zone (Price within 1 ATR of EMA21 - **Constraint:** Requires cross-column math (+/-), currently local only).
+    - [x] **Constraint - Action Zone**: Confirmed as "local only" due to library lack of cross-column arithmetic support.
 
 ### Technical Manual Alignment & Refinement
 - [x] **INVESTIGATE: Custom Indicator Periods**: Discovery: `EMA` supports custom periods, but `ADX` and `Stochastics` return `None` for non-standard periods in the current API version.
@@ -55,3 +60,4 @@
     - [x] Add `Relative Volume > 1.0` (Ensuring active participation).
     - [x] Add `Change % > 0` (Confirming daily bullish bias).
 - [x] **Scale Scanning Capacity**: Increase query `limit` from 150 to 500 to capture a wider universe of stacked trends before applying the highly restrictive RSI(2) and Action Zone filters.
+- [x] **Actionable Targets**: Calculate and include Conservative (2 ATR) and Stretch (3 ATR) targets in the reporting layer output.

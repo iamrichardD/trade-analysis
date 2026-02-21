@@ -27,7 +27,7 @@ The system executes the **Bounce 2.0** strategy as defined by Simon Ree. It iden
 2. **Deploy via Terraform Wrapper:** Run the deployment script by passing the endpoint, secret, and the path to your public key:
 
 ```bash
-   ./deploy_tao_scanner.sh "proxmox.local" "your-secret" "~/.ssh/id_ed25519.pub"
+   ./deploy_tao_scanner.sh "proxmox.lan" "your-secret" "~/.ssh/id_ed25519.pub"
 ```
 
 ## 🛡️ Best Practices

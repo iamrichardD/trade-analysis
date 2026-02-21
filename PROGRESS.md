@@ -17,3 +17,8 @@
 - [x] Implemented diagnostic logging in `_apply_filters` to track candidate counts at each step.
 - [x] Refactored filter logic into modular private methods to enable isolated testing.
 - [x] Added unit tests for each individual filter step in `test_scanner.py`.
+- [x] Refined Indicator Periods: Updated to `ADX(13)` and `Stochastics(8, 3)` (smoothed) to match technical manual.
+- [x] Expanded Trend Filters: Added institutional support checks (`Close > SMA50`, `Close > SMA100`).
+- [x] Volume/Momentum Quality: Added `Relative Volume > 1.0` and `Change % > 0` server-side filters.
+- [x] Scaled Scanning Capacity: Increased query limit from 150 to 500 to ensure high-quality candidates after restrictive RSI(2) filtering.
+- [x] Verified Data Integrity: All calculation columns (ATR, EMA21, etc.) are now included in the final output for auditability.

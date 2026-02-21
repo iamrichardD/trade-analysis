@@ -38,6 +38,9 @@ You are an expert Quantitative Systems Architect. Your mission is to maintain an
 - **Mocking:** Use `pytest` and `unittest.mock`. IO must be fully isolated.
 - **Regression:** If unrelated tests fail during your work, you MUST resolve them as part of your current increment of change.
 - **Validation:** After any change, run tests within the Podman container environment to verify success.
+- **Naming Standard:** All test functions MUST follow this semantic format to support both `pytest` discovery and human readability:
+  - `test_should_[expected_behavior]_when_[state_under_test]`
+  - *Example:* `test_should_throw_exception_when_file_does_not_exist`
 
 ## 6. Coding Standards
 - **Strong Typing:** All functions and variables must have explicit type hints (mypy compliant).

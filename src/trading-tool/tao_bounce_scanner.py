@@ -20,6 +20,12 @@ EMA_SLOW: int = 34
 EMA_EXTENDED_1: int = 55
 EMA_EXTENDED_2: int = 89
 SMA_TREND: int = 200
+SMA_INSTITUTIONAL_50: int = 50
+SMA_INSTITUTIONAL_100: int = 100
+
+# Indicator Period Mappings (TradingView Column Names)
+ADX_COL: str = "ADX"
+STOCH_K_COL: str = "Stoch.K"
 
 class TaoBounceScanner:
     """
@@ -41,23 +47,28 @@ class TaoBounceScanner:
         overcoming the default 50-row limit.
         """
         return (Query().set_markets('america')
-                .select('name', 'close', 'EMA8', 'EMA21', 'EMA34', 'EMA55', 'EMA89', 'SMA200', 
-                        'ATR', 'ADX', 'Stoch.K', 'relative_volume_10d_calc', 
+                .select('name', 'close', 'EMA8', 'EMA21', 'EMA34', 'EMA55', 'EMA89', 
+                        'SMA50', 'SMA100', 'SMA200', 
+                        'ATR', ADX_COL, STOCH_K_COL, 'relative_volume_10d_calc', 'change',
                         'RSI2', 'RSI2[1]', 'earnings_release_next_date')
                 .where(col('type').isin(['stock']))
                 .where(col('subtype').isin(['common']))
                 .where(col('market_cap_basic') > MIN_MARKET_CAP)
                 .where(col('average_volume_30d_calc') > MIN_AVG_VOLUME)
                 .where(col('exchange').isin(['NYSE', 'NASDAQ']))
-                .where(col('ADX') >= MIN_ADX)
+                .where(col('change') > 0)
+                .where(col('relative_volume_10d_calc') > 1.0)
+                .where(col(ADX_COL) >= MIN_ADX)
+                .where(col('close') > col(f'SMA{SMA_INSTITUTIONAL_50}'))
+                .where(col('close') > col(f'SMA{SMA_INSTITUTIONAL_100}'))
                 .where(col('close') > col(f'SMA{SMA_TREND}'))
                 .where(col(f'EMA{EMA_FAST}') > col(f'EMA{EMA_MEDIUM}'))
                 .where(col(f'EMA{EMA_MEDIUM}') > col(f'EMA{EMA_SLOW}'))
                 .where(col(f'EMA{EMA_SLOW}') > col(f'EMA{EMA_EXTENDED_1}'))
                 .where(col(f'EMA{EMA_EXTENDED_1}') > col(f'EMA{EMA_EXTENDED_2}'))
-                .where(col('Stoch.K') <= STOCH_PULLBACK_THRESHOLD)
+                .where(col(STOCH_K_COL) <= STOCH_PULLBACK_THRESHOLD)
                 .where(col('RSI2') > RSI_BULLISH_CROSS_LEVEL)
-                .limit(150))
+                .limit(500))
 
     def _fetch_data(self) -> pd.DataFrame:
         """
@@ -66,7 +77,15 @@ class TaoBounceScanner:
         """
         query = self._build_query()
         _, data = query.get_scanner_data()
-        return pd.DataFrame(data)
+        df = pd.DataFrame(data)
+        
+        # Ensure custom period columns are numeric
+        # Why: TradingView API may return non-standard columns as objects/strings.
+        for col_name in [ADX_COL, STOCH_K_COL]:
+            if col_name in df.columns:
+                df[col_name] = pd.to_numeric(df[col_name], errors='coerce')
+        
+        return df
 
     def _apply_filters(self, df: pd.DataFrame) -> pd.DataFrame:
         """
@@ -114,8 +133,13 @@ class TaoBounceScanner:
     def _filter_trend_strength(self, df: pd.DataFrame) -> pd.DataFrame:
         """
         Filters for stocks in a strong trend (ADX > 20) and above the 200 SMA.
+        Includes institutional support checks (50 and 100 SMAs).
         """
-        return df[(df['ADX'] >= MIN_ADX) & (df['close'] > df[f'SMA{SMA_TREND}'])]
+        mask = (df[ADX_COL] >= MIN_ADX) & \
+               (df['close'] > df[f'SMA{SMA_TREND}']) & \
+               (df['close'] > df[f'SMA{SMA_INSTITUTIONAL_50}']) & \
+               (df['close'] > df[f'SMA{SMA_INSTITUTIONAL_100}'])
+        return df[mask]
 
     def _filter_ema_stacking(self, df: pd.DataFrame) -> pd.DataFrame:
         """
@@ -131,7 +155,7 @@ class TaoBounceScanner:
         """
         Filters for stocks that have pulled back (Stochastics <= 40).
         """
-        return df[df['Stoch.K'] <= STOCH_PULLBACK_THRESHOLD]
+        return df[df[STOCH_K_COL] <= STOCH_PULLBACK_THRESHOLD]
 
     def _filter_action_zone(self, df: pd.DataFrame) -> pd.DataFrame:
         """
@@ -195,9 +219,11 @@ class TaoBounceScanner:
 
             # Final Selection for reporting
             output_columns = [
-                'name', 'close', f'SMA{SMA_TREND}', f'EMA{EMA_FAST}', f'EMA{EMA_MEDIUM}', 
-                f'EMA{EMA_SLOW}', f'EMA{EMA_EXTENDED_1}', f'EMA{EMA_EXTENDED_2}', 
-                'ATR', 'ADX', 'Stoch.K', 'relative_volume_10d_calc',
+                'name', 'close', 
+                f'SMA{SMA_INSTITUTIONAL_50}', f'SMA{SMA_INSTITUTIONAL_100}', f'SMA{SMA_TREND}', 
+                f'EMA{EMA_FAST}', f'EMA{EMA_MEDIUM}', f'EMA{EMA_SLOW}', 
+                f'EMA{EMA_EXTENDED_1}', f'EMA{EMA_EXTENDED_2}', 
+                'ATR', ADX_COL, STOCH_K_COL, 'relative_volume_10d_calc', 'change',
                 'RSI2', 'RSI2[1]', 'earnings_release_next_date'
             ]
             

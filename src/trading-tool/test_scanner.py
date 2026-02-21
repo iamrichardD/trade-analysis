@@ -3,7 +3,7 @@ import pandas as pd
 from unittest.mock import patch, MagicMock
 from typing import Dict, Any, Generator, List, Optional
 from datetime import datetime, timedelta
-from tao_bounce_scanner import run_tao_of_trading_scan, TaoBounceScanner
+from tao_bounce_scanner import run_tao_of_trading_scan, TaoBounceScanner, ADX_COL, STOCH_K_COL
 from storage import ScannerConfig
 
 @pytest.fixture
@@ -26,16 +26,19 @@ def get_default_stock_data() -> Dict[str, Any]:
     return {
         "name": "GOOD_STOCK",
         "close": 700.0,
+        "SMA50": 650.0,
+        "SMA100": 620.0,
         "SMA200": 600.0,
-        "ADX": 25.0,
+        ADX_COL: 25.0,
         "EMA8": 680.0,
         "EMA21": 670.0,
         "EMA34": 660.0,
         "EMA55": 650.0,
         "EMA89": 640.0,
-        "Stoch.K": 30.0,
+        STOCH_K_COL: 30.0,
         "ATR": 30.0,
         "relative_volume_10d_calc": 1.5,
+        "change": 1.2,
         "RSI2": 15.0,         # Bullish Trigger: Curr > 10
         "RSI2[1]": 5.0,       # Bullish Trigger: Prev <= 10
         "earnings_release_next_date": safe_earnings_date
@@ -47,7 +50,7 @@ def Should_FilterStock_When_ADXIsBelowThreshold(mock_get_scanner_data: MagicMock
     Why: ADX < 20 indicates a weak trend. Bounce 2.0 requires a strong trend.
     """
     stock_data = get_default_stock_data()
-    stock_data["ADX"] = 19.0
+    stock_data[ADX_COL] = 19.0
     mock_data = [None, [stock_data]]
     mock_get_scanner_data.return_value = mock_data
 
@@ -63,7 +66,7 @@ def Should_NotFilterStock_When_ADXIsAboveThreshold(mock_get_scanner_data: MagicM
     Why: Ensures valid candidates are not accidentally removed by the ADX filter.
     """
     stock_data = get_default_stock_data()
-    stock_data["ADX"] = 20.0
+    stock_data[ADX_COL] = 20.0
     mock_data = [None, [stock_data]]
     mock_get_scanner_data.return_value = mock_data
 
@@ -141,7 +144,7 @@ def Should_FilterStock_When_StochKIsAboveThreshold(mock_get_scanner_data: MagicM
     Why: We need a pullback. High Stochastics imply price is not sufficiently pulled back.
     """
     stock_data = get_default_stock_data()
-    stock_data["Stoch.K"] = 41.0
+    stock_data[STOCH_K_COL] = 41.0
     mock_data = [None, [stock_data]]
     mock_get_scanner_data.return_value = mock_data
 
@@ -157,7 +160,7 @@ def Should_NotFilterStock_When_StochKIsBelowThreshold(mock_get_scanner_data: Mag
     Why: Identifies stocks that are oversold/pulled back within the uptrend.
     """
     stock_data = get_default_stock_data()
-    stock_data["Stoch.K"] = 40.0
+    stock_data[STOCH_K_COL] = 40.0
     mock_data = [None, [stock_data]]
     mock_get_scanner_data.return_value = mock_data
 
@@ -304,13 +307,14 @@ def Should_NotFilterStock_When_RSI2_triggers(mock_get_scanner_data: MagicMock) -
 def test_filter_trend_strength() -> None:
     """
     Tests _filter_trend_strength in isolation.
-    Why: Ensures the trend filter correctly identifies candidates above SMA200 with ADX >= 20.
+    Why: Ensures the trend filter correctly identifies candidates above SMA200, SMA100, SMA50 with ADX[13] >= 20.
     """
     scanner = TaoBounceScanner(ScannerConfig(output_type="log"))
     df = pd.DataFrame([
-        {"name": "PASS", "close": 110, "SMA200": 100, "ADX": 25},
-        {"name": "FAIL_SMA", "close": 90, "SMA200": 100, "ADX": 25},
-        {"name": "FAIL_ADX", "close": 110, "SMA200": 100, "ADX": 15},
+        {"name": "PASS", "close": 110, "SMA200": 100, "SMA100": 90, "SMA50": 80, ADX_COL: 25},
+        {"name": "FAIL_SMA200", "close": 90, "SMA200": 100, "SMA100": 80, "SMA50": 70, ADX_COL: 25},
+        {"name": "FAIL_SMA100", "close": 95, "SMA200": 90, "SMA100": 100, "SMA50": 80, ADX_COL: 25},
+        {"name": "FAIL_ADX", "close": 110, "SMA200": 100, "SMA100": 90, "SMA50": 80, ADX_COL: 15},
     ])
     result = scanner._filter_trend_strength(df)
     assert len(result) == 1
@@ -333,12 +337,12 @@ def test_filter_ema_stacking() -> None:
 def test_filter_pullback() -> None:
     """
     Tests _filter_pullback in isolation.
-    Why: Ensures stocks with Stoch.K <= 40 are correctly identified as pullbacks.
+    Why: Ensures stocks with Stoch.K[8]|3 <= 40 are correctly identified as pullbacks.
     """
     scanner = TaoBounceScanner(ScannerConfig(output_type="log"))
     df = pd.DataFrame([
-        {"name": "PASS", "Stoch.K": 35},
-        {"name": "FAIL", "Stoch.K": 45},
+        {"name": "PASS", STOCH_K_COL: 35},
+        {"name": "FAIL", STOCH_K_COL: 45},
     ])
     result = scanner._filter_pullback(df)
     assert len(result) == 1

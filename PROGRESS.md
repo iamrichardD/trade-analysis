@@ -22,6 +22,10 @@
 - [x] Updated `storage.py` with `SNSWriter` and updated `ScannerConfig` to support email notifications.
 - [x] Created `test_sns_writer.py` and verified all tests pass in Podman (38 tests total).
 - [x] Updated `Containerfile` and `Containerfile.test` for AWS SDK support.
+- [x] Created project root-level `README.md` with comprehensive documentation (Quick Start, The 'Why', Architecture).
+- [x] Documented "Zero-Host Policy" and security architecture in root README.
+- [x] Added "Secrets & Configuration" section to root README.md to document Proxmox and AWS credential requirements.
+- [x] Documented optional `--security-opt seccomp=unconfined` flag for Podman troubleshooting in root README.md.
 
 ## 2026-02-20
 - [x] Initialized `TODO.md` and `PROGRESS.md`.

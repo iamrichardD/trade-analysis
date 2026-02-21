@@ -80,3 +80,12 @@
     - [x] Document secure credential injection workflow via Podman secrets or environment files.
 - [x] **Documentation**:
     - [x] Provide step-by-step instructions for subscription confirmation and Terraform deployment.
+
+## Project-Level Documentation
+- [x] **Create Root README.md**:
+    - [x] Implement a "Quick Start" section for experienced developers (Podman execution, environment setup).
+    - [x] Implement a "Conceptual Overview" for novices (The 'Why' of Bounce 2.0, the Tao of Trading strategy, and the architecture).
+    - [x] Document the "Zero-Host Policy" and security architecture (IAM, SNS, Podman secrets).
+    - [x] Document credentials and tokens (Proxmox, AWS) in the root README.md.
+    - [x] Document optional `--security-opt seccomp=unconfined` flag for Podman troubleshooting in root README.md.
+    - [x] Add a visual/textual representation of the data flow.

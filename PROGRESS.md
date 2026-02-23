@@ -38,6 +38,7 @@
     - [x] Ensured all validation fields (EMA21, ATR, etc.) are explicitly visible for math auditing.
     - [x] Updated `test_storage.py` and `test_sns_writer.py` to verify AI-friendly formatting.
     - [x] Verified output with a live scan in Podman (40 passing tests total).
+- [x] **Planned New Feature: Gemini Gem Integration & State Tracking**: Scoped automated reporting via Google AI SDK and persistent JSON store for trade lifecycle management.
 
 ## 2026-02-20
 - [x] Initialized `TODO.md` and `PROGRESS.md`.

@@ -100,14 +100,22 @@
 
 ## Future Enhancements
 
-### AI & Reporting (Gemini Gem Integration)
-- [x] **AI-Friendly Log Output**: Optimize CLI output for direct copy-pasting into LLMs (Gemini/ChatGPT) to generate structured trade reports.
-    - **Goal**: Enable a seamless workflow where scanner output can be pasted into a Gemini Gem to produce a "Trade Readiness Report" based on the `@gem/dao-of-trading-technical-manual.md`.
-    - **Format Shift**: Transition `LogWriter` from `df.to_string()` to `df.to_markdown()` for superior LLM table parsing.
-    - **Metadata Injection**: Include a "Scan Context" block (Markdown/YAML) containing:
-        - Timestamp of execution.
-        - Strategy Name (Bounce 2.0).
-        - Scan Direction (LONG/SHORT).
-        - Applied Thresholds (ADX, RSI levels, EMA periods).
-    - **Prompt Wrapper**: Prepend the output with a "Instruction Block" that tells the AI exactly how to process the data (e.g., "You are the Tao of Trading Analyst. Verify the following candidates against the Technical Manual...").
-    - **Validation Fields**: Ensure all raw inputs for calculated targets (EMA21, ATR) are explicitly visible so the AI can audit the math.
+### Automated Gemini Gem Integration & State Tracking (NEW)
+- [ ] **State Management Architecture**:
+    - [ ] Define `StateStore` abstract base class in `storage.py` for persistent tracking.
+    - [ ] Implement `JsonStateStore` for quick-start file-based persistence (Iteration 1).
+    - [ ] Add `STATE_STORE_PATH` to `ScannerConfig` and `.env` support.
+- [ ] **Gemini API Integration**:
+    - [ ] Add `google-generativeai` to `requirements.txt`.
+    - [ ] Implement `GeminiWriter(DataWriter)` to handle automated trade readiness reports.
+    - [ ] Create a "Prompt Factory" to manage strategy-aligned system instructions (Bounce 2.0).
+    - [ ] Implement rate-limiting and token management for cost-efficiency.
+- [ ] **Ticker Lifecycle & Progress Tracking**:
+    - [ ] Implement `track_progress()` in `TaoBounceScanner` to monitor "PASS" tickers.
+    - [ ] Add logic to differentiate between "New Discovery" and "Ongoing Watch" reporting.
+    - [ ] Implement automated "Retirement" logic (Target Hit / Stop Hit / Trend Break).
+- [ ] **DevSecOps & UX**:
+    - [ ] Update `SNSWriter` to include a "Tracked Positions Progress" section in daily alerts.
+    - [ ] Document `GEMINI_API_KEY` setup and secure injection in root README.md.
+    - [ ] Add unit tests for state transitions (Discovery -> Tracking -> Retirement).
+    - [ ] Implement backup/restore logic for `JsonStateStore` to ensure data integrity.
